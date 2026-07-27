@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import type { Incident } from "../lib/demo-data";
+import type { DiagnosticSnapshot } from "../lib/diagnostic-snapshot";
 import {
   createRobustnessCertificate,
   retrieveSimilarCases,
   buildFaultFingerprint,
-  type RobustnessCertificate,
 } from "../lib/diagnostic-intelligence";
 
 type DepthTab = "robustness" | "fingerprint";
@@ -19,22 +19,34 @@ function stabilityTone(value: number): string {
   return "sensitive";
 }
 
-export default function DiagnosticDepthPanel({ incident }: { incident: Incident }) {
+export default function DiagnosticDepthPanel({
+  incident,
+  snapshot,
+}: {
+  incident: Incident;
+  snapshot: DiagnosticSnapshot;
+}) {
   const [tab, setTab] = useState<DepthTab>("robustness");
   const [rechecking, setRechecking] = useState(false);
-  const [certificate, setCertificate] = useState<RobustnessCertificate>(() =>
-    createRobustnessCertificate(incident, { trials: 100 }),
+  const [rerunNonce, setRerunNonce] = useState(0);
+  const diagnosticIncident = useMemo(
+    () => ({ ...incident, hypotheses: snapshot.hypotheses }),
+    [incident, snapshot],
   );
+  const certificate = createRobustnessCertificate(diagnosticIncident, { trials: 100 });
   const fingerprint = useMemo(
-    () => buildFaultFingerprint(incident.kind, incident.telemetry),
-    [incident],
+    () => buildFaultFingerprint(diagnosticIncident.kind, diagnosticIncident.telemetry),
+    [diagnosticIncident],
   );
-  const matches = useMemo(() => retrieveSimilarCases(incident, 3), [incident]);
+  const matches = useMemo(
+    () => retrieveSimilarCases(diagnosticIncident, 3),
+    [diagnosticIncident],
+  );
 
   const rerun = () => {
     setRechecking(true);
     window.setTimeout(() => {
-      setCertificate(createRobustnessCertificate(incident, { trials: 100 }));
+      setRerunNonce((current) => current + 1);
       setRechecking(false);
     }, 420);
   };
@@ -44,11 +56,11 @@ export default function DiagnosticDepthPanel({ incident }: { incident: Incident 
   const topMatch = matches[0];
 
   return (
-    <section className="depth-card" aria-label="诊断稳健性与历史案例复用">
+    <section className="depth-card" aria-label="诊断稳健性与历史案例复用" data-rerun-count={rerunNonce}>
       <header className="depth-card-head">
         <div>
-          <span className="eyebrow">P3–P4 · DIAGNOSTIC ASSURANCE</span>
-          <h2>这条结论，经得起扰动与历史对照吗？</h2>
+          <span className="eyebrow">可信度校验 · 当前快照 {snapshot.mode === "scene_verified" ? "V1" : "L0"}</span>
+          <h2>这条排序，经得起扰动与案例差异检查吗？</h2>
         </div>
         <div className="depth-tabs" role="tablist" aria-label="诊断深度工具">
           <button type="button" role="tab" aria-selected={tab === "robustness"} className={tab === "robustness" ? "active" : ""} onClick={() => setTab("robustness")}>抗扰动证书</button>
@@ -59,19 +71,19 @@ export default function DiagnosticDepthPanel({ incident }: { incident: Incident 
       {tab === "robustness" ? (
         <div className="robustness-view">
           <div className="certificate-summary">
-            <div className="certificate-seal"><strong>{certificate.trials}</strong><span>次真实重算</span><small>固定种子可复现</small></div>
+            <div className="certificate-seal"><strong>{certificate.trials}</strong><span>次确定性扰动重算</span><small>固定种子可复现</small></div>
             <div className="stability-metrics">
               {[
                 ["规则检出稳定", certificate.detectionStabilityRate],
                 ["Top1 排名稳定", certificate.top1StabilityRate],
-                ["Top3 集合稳定", certificate.top3StabilityRate],
+                ["Top3 排序一致", certificate.top3StabilityRate],
               ].map(([label, raw]) => {
                 const value = raw as number;
                 return <article key={label as string} className={stabilityTone(value)}><span>{label as string}</span><strong>{percentage(value)}</strong><i><b style={{ width: percentage(value) }} /></i></article>;
               })}
             </div>
             <button className="rerun-certificate" type="button" onClick={rerun} disabled={rechecking}>
-              {rechecking ? "正在执行 100 次扰动…" : "重新验算 100 次"}
+              {rechecking ? "正在复现 100 次扰动…" : "复现同一组 100 次扰动"}
             </button>
           </div>
           <div className="robustness-explain">
@@ -103,7 +115,7 @@ export default function DiagnosticDepthPanel({ incident }: { incident: Incident 
             <article className="top-case-match">
               <div className="match-score"><strong>{percentage(topMatch.similarity)}</strong><span>综合相似度</span><small>序列 {percentage(topMatch.sequenceSimilarity)} · 数值 {percentage(topMatch.numericSimilarity)}</small></div>
               <div className="match-main">
-                <span>Top 1 已核验案例 · {topMatch.historicalCase.id}</span>
+                <span>Top 1 合成基准案例 · {topMatch.historicalCase.id}</span>
                 <h3>{topMatch.historicalCase.title}</h3>
                 <p><b>已确认原因：</b>{topMatch.historicalCase.verifiedHypothesis.title}</p>
                 <div className="matched-events">{topMatch.matchedEvents.map((item) => <em key={item}>{item}</em>)}</div>
@@ -118,7 +130,7 @@ export default function DiagnosticDepthPanel({ incident }: { incident: Incident 
           <div className="other-case-matches">
             {matches.slice(1).map((match) => <article key={match.historicalCase.id}><span>{match.historicalCase.id}</span><strong>{match.historicalCase.title}</strong><b>{percentage(match.similarity)}</b><small>{match.historicalCase.verifiedHypothesis.title}</small></article>)}
           </div>
-          <p className="assurance-boundary">案例库含 12 个已人工核验的合成案例；相似只用于缩小排查范围，不直接继承历史根因。</p>
+          <p className="assurance-boundary">案例库含 12 条人工设计的合成基准案例；相似只用于验证检索流程与缩小排查范围，不代表真实道路准确率。</p>
         </div>
       )}
     </section>

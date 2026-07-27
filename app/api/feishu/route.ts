@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { incidents } from "../../lib/demo-data";
 import { buildIncidentReviewCard, sendFeishuInteractiveCard } from "../../lib/feishu-card";
+import {
+  createDiagnosticSnapshot,
+  type EvidenceMode,
+} from "../../lib/diagnostic-snapshot";
 
 interface SyncRequest {
   eventId?: string;
+  evidenceMode?: EvidenceMode;
+  snapshotId?: string;
+  selectedHypothesisId?: string;
   review?: {
     status?: string;
     rootCause?: string;
@@ -28,12 +35,18 @@ interface CreateRecordResponse {
 function buildFields(body: SyncRequest) {
   const incident = incidents.find((item) => item.id === body.eventId);
   if (!incident) return null;
-  const top3 = incident.hypotheses
+  const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
+    ? "scene_verified"
+    : "logs_only";
+  const snapshot = createDiagnosticSnapshot(incident, evidenceMode);
+  const selected = snapshot.hypotheses.find((item) => item.id === body.selectedHypothesisId)
+    ?? snapshot.hypotheses[0];
+  const top3 = snapshot.hypotheses
     .map((item, index) => `${index + 1}. ${item.title}（匹配度 ${item.score}）`)
     .join("\n");
-  const missing = Array.from(new Set(incident.hypotheses.flatMap((item) => item.missing))).join("；");
+  const missing = Array.from(new Set(snapshot.hypotheses.flatMap((item) => item.missing))).join("；");
 
-  return {
+  const fields = {
     "事件ID": incident.id,
     "发生时间": `2026-07-26 ${incident.happenedAt}+08:00`,
     "车辆ID": incident.vehicle,
@@ -41,15 +54,21 @@ function buildFields(body: SyncRequest) {
     "异常类型": incident.title,
     "风险等级": incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2",
     "触发规则": `${incident.rule}\n${incident.trigger}`,
-    "证据摘要": incident.facts.map((fact) => `${fact.label}: ${fact.value}；${fact.detail}`).join("\n"),
+    "证据摘要": [
+      `快照：${snapshot.snapshotId}`,
+      `覆盖：${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）`,
+      `门禁：${snapshot.gate.canConfirm ? "可进入人工确认" : "禁止确认根因"}`,
+      ...incident.facts.map((fact) => `${fact.label}: ${fact.value}；${fact.detail}`),
+    ].join("\n"),
     "候选原因Top3": top3,
     "缺失证据": missing,
-    "核验建议": incident.hypotheses[0].action,
+    "核验建议": selected.action,
     "回放地址": body.replayUrl ?? "http://localhost:3001/",
     "核验状态": body.review?.status ?? "待核验",
     "人工根因": body.review?.rootCause ?? "",
     "修复版本": "",
   };
+  return { incident, snapshot, fields };
 }
 
 export async function POST(request: Request) {
@@ -64,9 +83,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const fields = buildFields(body);
-  if (!fields || !body.eventId) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
-  const localCardPreview = buildIncidentReviewCard(body.eventId, { replayUrl: body.replayUrl });
+  const resolved = buildFields(body);
+  if (!resolved || !body.eventId) {
+    return NextResponse.json({ error: "unknown_event" }, { status: 404 });
+  }
+  const { incident, snapshot, fields } = resolved;
+  if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
+    return NextResponse.json(
+      { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
+      { status: 409 },
+    );
+  }
+  if (body.review?.status === "已核验" && !snapshot.gate.canConfirm) {
+    return NextResponse.json(
+      { error: "evidence_gate_blocked", blockers: snapshot.gate.blockers },
+      { status: 422 },
+    );
+  }
+  const localCardPreview = buildIncidentReviewCard(
+    incident,
+    snapshot,
+    { replayUrl: body.replayUrl },
+  );
   if (!localCardPreview) return NextResponse.json({ error: "card_preview_unavailable" }, { status: 500 });
 
   const appId = process.env.FEISHU_APP_ID;
@@ -131,7 +169,11 @@ export async function POST(request: Request) {
       throw new Error(`record_${recordPayload.code}_${recordPayload.msg}`);
     }
 
-    const cardPreview = buildIncidentReviewCard(body.eventId, { recordId, replayUrl: body.replayUrl });
+    const cardPreview = buildIncidentReviewCard(
+      incident,
+      snapshot,
+      { recordId, replayUrl: body.replayUrl },
+    );
     if (!cardPreview) {
       return NextResponse.json({
         mode: "bitable-only",

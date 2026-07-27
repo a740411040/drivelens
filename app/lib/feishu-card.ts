@@ -1,4 +1,5 @@
-import { incidents } from "./demo-data";
+import type { Incident } from "./demo-data";
+import type { DiagnosticSnapshot } from "./diagnostic-snapshot";
 
 export type FeishuInteractiveCard = Record<string, unknown>;
 
@@ -18,34 +19,21 @@ function safeError(value: unknown, fallback: string): string {
 }
 
 export function buildIncidentReviewCard(
-  eventId: string,
+  incident: Incident,
+  snapshot: DiagnosticSnapshot,
   options: { recordId?: string; replayUrl?: string } = {},
 ): FeishuInteractiveCard | null {
-  const incident = incidents.find((item) => item.id === eventId);
-  if (!incident) return null;
-
-  const top = incident.hypotheses[0];
-  if (!top) return null;
+  const top = snapshot.hypotheses[0];
+  if (!top || snapshot.eventId !== incident.id) return null;
   const recordId = options.recordId ?? "待创建";
   const replayUrl = options.replayUrl ?? "http://localhost:3001/";
-  const callbackValue = {
-    eventId: incident.id,
-    recordId: options.recordId ?? "",
-    topCause: top.title,
-  };
+  const gateLabel = snapshot.gate.canConfirm ? "可进入人工确认" : "仅可补证 / 转专业排查";
 
   return {
-    config: {
-      wide_screen_mode: true,
-      enable_forward: true,
-      update_multi: true,
-    },
+    config: { wide_screen_mode: true, enable_forward: true, update_multi: true },
     header: {
-      template: incident.risk === "高" ? "red" : "orange",
-      title: {
-        tag: "plain_text",
-        content: `DriveLens · ${incident.title}`,
-      },
+      template: snapshot.gate.canConfirm ? "green" : incident.risk === "高" ? "red" : "orange",
+      title: { tag: "plain_text", content: `DriveLens · ${incident.title}` },
     },
     elements: [
       {
@@ -53,76 +41,36 @@ export function buildIncidentReviewCard(
         fields: [
           { is_short: true, text: { tag: "lark_md", content: `**事件**\n${incident.id}` } },
           { is_short: true, text: { tag: "lark_md", content: `**风险**\n${incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2"}` } },
-          { is_short: true, text: { tag: "lark_md", content: `**车辆**\n${incident.vehicle}` } },
-          { is_short: true, text: { tag: "lark_md", content: `**位置**\n${incident.location}` } },
+          { is_short: true, text: { tag: "lark_md", content: `**证据版本**\n${snapshot.mode === "scene_verified" ? "V1 现场补证" : "L0 仅日志"}` } },
+          { is_short: true, text: { tag: "lark_md", content: `**证据门禁**\n${gateLabel}` } },
         ],
       },
       {
         tag: "div",
         text: {
           tag: "lark_md",
-          content: "**诊断证据入口**\n同步日志回放 · 规则触发 · 候选疑因与反证",
-        },
-      },
-      {
-        tag: "div",
-        text: {
-          tag: "lark_md",
-          content: `**Top1 疑因（${top.score}/100）**\n${top.title}\n${top.summary}`,
+          content: `**Top1 疑因（${top.score}/100）**\n${top.title}\n基线 ${top.priorScore} + 支持 ${top.supportPoints} − 反证 ${top.counterPoints}`,
         },
       },
       {
         tag: "div",
         fields: [
-          {
-            is_short: false,
-            text: { tag: "lark_md", content: `**支持证据**\n${top.support.slice(0, 2).join("\n") || "暂无"}` },
-          },
-          {
-            is_short: false,
-            text: {
-              tag: "lark_md",
-              content: `**反证 / 不确定性**\n${top.counterEvidence.slice(0, 2).join("\n") || "尚未发现反证"}`,
-            },
-          },
-          {
-            is_short: false,
-            text: { tag: "lark_md", content: `**仍缺证据**\n${top.missing.join("、") || "等待人工核验"}` },
-          },
+          { is_short: false, text: { tag: "lark_md", content: `**支持证据**\n${top.support.slice(0, 3).join("\n") || "暂无"}` } },
+          { is_short: false, text: { tag: "lark_md", content: `**反证 / 不确定性**\n${top.counterEvidence.slice(0, 3).join("\n") || "尚未完成反证评估"}` } },
+          { is_short: false, text: { tag: "lark_md", content: `**仍缺证据**\n${top.missing.join("、") || "关键槽位已补齐"}` } },
         ],
+      },
+      {
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: `**证据覆盖** ${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）\n**快照ID** ${snapshot.snapshotId}`,
+        },
       },
       {
         tag: "action",
         actions: [
-          {
-            tag: "button",
-            type: "primary",
-            text: { tag: "plain_text", content: "采纳Top1" },
-            value: { ...callbackValue, action: "accept_top1" },
-          },
-          {
-            tag: "button",
-            type: "default",
-            text: { tag: "plain_text", content: "证据不足" },
-            value: { ...callbackValue, action: "request_evidence" },
-          },
-          {
-            tag: "button",
-            type: "danger",
-            text: { tag: "plain_text", content: "转专业排查" },
-            value: { ...callbackValue, action: "escalate" },
-          },
-        ],
-      },
-      {
-        tag: "action",
-        actions: [
-          {
-            tag: "button",
-            type: "default",
-            text: { tag: "plain_text", content: "打开证据回放" },
-            url: replayUrl,
-          },
+          { tag: "button", type: "primary", text: { tag: "plain_text", content: "打开证据回放" }, url: replayUrl },
         ],
       },
       {
@@ -130,7 +78,7 @@ export function buildIncidentReviewCard(
         elements: [
           {
             tag: "plain_text",
-            content: `多维表格记录 ${recordId}。AI 仅提供候选疑因和证据链，最终结论由专业人员确认。`,
+            content: `多维表格记录 ${recordId}。人工结论在异常事件表中完成；本卡不伪装已接通按钮回写。`,
           },
         ],
       },
@@ -144,31 +92,40 @@ export async function sendFeishuInteractiveCard(input: {
   card: FeishuInteractiveCard;
 }): Promise<FeishuCardSendResult> {
   try {
-    const response = await fetch("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${input.tenantAccessToken}`,
-        "Content-Type": "application/json; charset=utf-8",
+    const response = await fetch(
+      "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${input.tenantAccessToken}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify({
+          receive_id: input.chatId,
+          msg_type: "interactive",
+          content: JSON.stringify(input.card),
+        }),
       },
-      body: JSON.stringify({
-        receive_id: input.chatId,
-        msg_type: "interactive",
-        content: JSON.stringify(input.card),
-      }),
-    });
-
+    );
     const payload = (await response.json().catch(() => null)) as unknown;
     const code = isRecord(payload) && typeof payload.code === "number" ? payload.code : -1;
     const data = isRecord(payload) && isRecord(payload.data) ? payload.data : null;
     const messageId = data && typeof data.message_id === "string" ? data.message_id : null;
     if (!response.ok || code !== 0 || !messageId) {
-      const message = isRecord(payload) ? safeError(payload.msg, `http_${response.status}`) : `http_${response.status}`;
-      return { ok: false, messageId: null, status: response.status, error: `card_${code}_${message}` };
+      return {
+        ok: false,
+        messageId: null,
+        status: response.status,
+        error: isRecord(payload) ? safeError(payload.msg, `feishu_code_${code}`) : "invalid_feishu_response",
+      };
     }
-
     return { ok: true, messageId, status: response.status, error: null };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "network_error";
-    return { ok: false, messageId: null, status: 0, error: safeError(message, "network_error") };
+    return {
+      ok: false,
+      messageId: null,
+      status: 0,
+      error: error instanceof Error ? safeError(error.message, "network_error") : "network_error",
+    };
   }
 }

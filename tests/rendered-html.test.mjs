@@ -14,7 +14,9 @@ test("ships three deterministic demo incidents", async () => {
 
 test("keeps human review and counter-evidence visible", async () => {
   const source = await read("app/DriveLensApp.tsx");
-  assert.match(source, /AI 只排序疑因，根因须由工程师核验/);
+  assert.match(source, /模型只做解释/);
+  assert.match(source, /证据贡献账本/);
+  assert.match(source, /证据门禁/);
   assert.match(source, /反证/);
   assert.match(source, /缺失证据/);
   assert.match(source, /同步到飞书 \/ 本地队列/);

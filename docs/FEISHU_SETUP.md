@@ -2,7 +2,7 @@
 
 ## 最小配置
 
-1. 在飞书开放平台创建企业自建应用，并为应用开通多维表格记录读写权限。
+1. 在飞书开放平台创建企业自建应用，并为应用开通多维表格记录读写权限；如需发送群卡，再开通机器人发送消息权限。
 2. 新建一个多维表格和“异常事件”数据表，将应用添加为协作者。
 3. 按下列名称创建文本字段：事件ID、发生时间、车辆ID、场景、异常类型、风险等级、触发规则、证据摘要、候选原因Top3、缺失证据、核验建议、回放地址、核验状态、人工根因、修复版本。
 4. 复制 `.env.example` 为 `.env.local`，填写应用与数据表标识，并设置 `FEISHU_SYNC_ENABLED=true`。
@@ -14,6 +14,7 @@ FEISHU_APP_ID=cli_xxx
 FEISHU_APP_SECRET=xxx
 FEISHU_BITABLE_APP_TOKEN=bascn_xxx
 FEISHU_BITABLE_TABLE_ID=tbl_xxx
+FEISHU_CHAT_ID=oc_xxx
 ```
 
 ## 降级行为
@@ -26,6 +27,14 @@ FEISHU_BITABLE_TABLE_ID=tbl_xxx
 - 写入多维表格失败。
 
 真实密钥只保存在 `.env.local`，不要写入截图、演示文档或 Git 仓库。
+
+## 当前协同边界
+
+- 已实现：服务端获取 tenant access token、新增多维表格记录、发送群卡片、失败时生成本地待发送载荷。
+- 已实现：同步前按 eventId 与 evidenceMode 重建诊断快照；snapshotId 不一致返回 409，证据门禁未通过却写入“已核验”返回 422。
+- 群卡只提供“打开证据回放”入口；人工结论在多维表格中完成。
+- `/api/feishu/review` 是供多维表格工作流或受控服务调用的标准化更新接口，不是飞书 `card.action.trigger` 事件回调。
+- 尚未配置飞书事件订阅、验签与按钮回调，因此界面不会宣称群卡按钮已经回写。
 
 ## 官方接口
 

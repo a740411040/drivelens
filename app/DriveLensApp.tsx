@@ -6,14 +6,19 @@ import {
   detectRules,
   incidents,
   signalDefinitions,
-  type Hypothesis,
   type Incident,
   type SignalKey,
   type TelemetryPoint,
 } from "./lib/demo-data";
 import EvidenceChallenge from "./components/EvidenceChallenge";
 import DiagnosticDepthPanel from "./components/DiagnosticDepthPanel";
-import { hypothesesForEvidence, type EvidenceMode } from "./lib/evidence-modes";
+import {
+  createDiagnosticSnapshot,
+  gateBlockerLabel,
+  type DiagnosticSnapshot,
+  type EvidenceMode,
+  type RankedHypothesis,
+} from "./lib/diagnostic-snapshot";
 
 type ReviewDecision = "confirmed" | "rejected" | "needs_evidence";
 
@@ -22,12 +27,15 @@ interface ReviewRecord {
   hypothesisId: string;
   note: string;
   updatedAt: string;
+  snapshotId: string;
   taskId?: string;
 }
 
 interface DiagnoseResponse {
   mode: "evidence-engine" | "model-enhanced";
-  hypotheses: Hypothesis[];
+  engine: string;
+  snapshot: DiagnosticSnapshot;
+  narrative?: string;
   notice?: string;
 }
 
@@ -42,6 +50,14 @@ interface SyncResponse {
 const diagnosisSteps = ["日志对时", "关键变化提取", "相似案例检索", "疑因排序"];
 const supplementSteps = ["接收现场标注", "校验时间戳", "重算支持与反证", "更新疑因排序"];
 type AnalysisPurpose = "diagnosis" | "supplement";
+type DemoStage = 1 | 2 | 3 | 4;
+
+const demoStages: Array<{ id: DemoStage; label: string }> = [
+  { id: 1, label: "现场还原" },
+  { id: 2, label: "疑因竞争" },
+  { id: 3, label: "补证改判" },
+  { id: 4, label: "工程协同" },
+];
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -107,7 +123,7 @@ function SignalChart({ incident, activeSignals }: { incident: Incident; activeSi
       const minT = incident.telemetry[0].t;
       const maxT = incident.telemetry[incident.telemetry.length - 1].t;
       const xAt = (t: number) => left + ((t - minT) / (maxT - minT)) * plotWidth;
-      context.font = "11px system-ui, sans-serif";
+      context.font = "12px system-ui, sans-serif";
       context.textBaseline = "middle";
 
       activeSignals.forEach((key, laneIndex) => {
@@ -134,9 +150,9 @@ function SignalChart({ incident, activeSignals }: { incident: Incident; activeSi
         context.fillStyle = "#44516b";
         context.fillText(definition.label, 8, laneTop + 16);
         context.fillStyle = "#8b97aa";
-        context.font = "10px ui-monospace, monospace";
+        context.font = "11px ui-monospace, monospace";
         context.fillText(`${rawMax.toFixed(2)} / ${rawMin.toFixed(2)}`, 8, laneTop + 33);
-        context.font = "11px system-ui, sans-serif";
+        context.font = "12px system-ui, sans-serif";
 
         context.strokeStyle = definition.color;
         context.lineWidth = 2.2;
@@ -162,7 +178,7 @@ function SignalChart({ incident, activeSignals }: { incident: Incident; activeSi
       context.stroke();
       context.setLineDash([]);
       context.fillStyle = "#e5484d";
-      context.font = "700 10px system-ui, sans-serif";
+      context.font = "700 11px system-ui, sans-serif";
       context.fillText("触发点 t=0", triggerX + 6, 13);
 
       const cursorX = xAt(cursorPoint.t);
@@ -174,7 +190,7 @@ function SignalChart({ incident, activeSignals }: { incident: Incident; activeSi
       context.stroke();
 
       context.fillStyle = "#67758f";
-      context.font = "10px ui-monospace, monospace";
+      context.font = "11px ui-monospace, monospace";
       [-20, -10, 0, 10, 20].forEach((tick) => context.fillText(`${tick > 0 ? "+" : ""}${tick}s`, xAt(tick) - 9, height - 8));
     };
 
@@ -208,11 +224,11 @@ function SignalChart({ incident, activeSignals }: { incident: Incident; activeSi
   );
 }
 
-function HypothesisCard({ hypothesis, selected, onSelect }: { hypothesis: Hypothesis; selected: boolean; onSelect: () => void }) {
+function HypothesisCard({ hypothesis, selected, onSelect }: { hypothesis: RankedHypothesis; selected: boolean; onSelect: () => void }) {
   return (
     <button className={cx("hypothesis-card", selected && "selected")} onClick={onSelect} type="button" data-testid={`hypothesis-${hypothesis.id}`}>
       <span className="rank-score">{hypothesis.score}</span>
-      <span className="hypothesis-copy"><strong>{hypothesis.title}</strong><small>{hypothesis.owner} · 证据匹配度</small></span>
+      <span className="hypothesis-copy"><strong>#{hypothesis.rank} {hypothesis.title}</strong><small>{hypothesis.owner} · 证据匹配度</small></span>
       <span className="chevron">›</span>
     </button>
   );
@@ -220,32 +236,47 @@ function HypothesisCard({ hypothesis, selected, onSelect }: { hypothesis: Hypoth
 
 export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?: string }) {
   const initialIncident = incidents.find((item) => item.id === initialIncidentId) ?? incidents[0];
+  const initialSnapshot = createDiagnosticSnapshot(initialIncident, "logs_only");
   const [selectedId, setSelectedId] = useState(initialIncident.id);
   const [activeSignals, setActiveSignals] = useState<SignalKey[]>(["speed", "acceleration", "distance", "trackingConfidence"]);
   const [analysisState, setAnalysisState] = useState<"ready" | "running" | "complete">("complete");
   const [analysisProgress, setAnalysisProgress] = useState(diagnosisSteps.length);
-  const [selectedHypothesisId, setSelectedHypothesisId] = useState(initialIncident.hypotheses[0].id);
+  const [selectedHypothesisId, setSelectedHypothesisId] = useState(initialSnapshot.hypotheses[0].id);
   const [decision, setDecision] = useState<ReviewDecision>("needs_evidence");
   const [note, setNote] = useState("");
   const [reviews, setReviews] = useState<Record<string, ReviewRecord>>({});
-  const [runtimeHypotheses, setRuntimeHypotheses] = useState<Record<string, Hypothesis[]>>({});
   const [evidenceModes, setEvidenceModes] = useState<Record<string, EvidenceMode>>({});
   const [analysisPurpose, setAnalysisPurpose] = useState<AnalysisPurpose>("diagnosis");
   const [agentMode, setAgentMode] = useState<"证据模式" | "模型增强" | "补证改判">("证据模式");
   const [syncOpen, setSyncOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [demoStage, setDemoStage] = useState<DemoStage>(1);
 
   const incident = incidents.find((item) => item.id === selectedId) ?? incidents[0];
   const evidenceMode = evidenceModes[incident.id] ?? "logs_only";
-  const baseHypotheses = runtimeHypotheses[incident.id] ?? incident.hypotheses;
-  const hypotheses = hypothesesForEvidence({ ...incident, hypotheses: baseHypotheses }, evidenceMode);
+  const snapshot = useMemo(
+    () => createDiagnosticSnapshot(incident, evidenceMode),
+    [incident, evidenceMode],
+  );
+  const hypotheses = snapshot.hypotheses;
   const selectedHypothesis = hypotheses.find((item) => item.id === selectedHypothesisId) ?? hypotheses[0];
   const activeAnalysisSteps = analysisPurpose === "supplement" ? supplementSteps : diagnosisSteps;
   const rules = detectRules(incident.telemetry);
-  const review = reviews[incident.id];
+  const storedReview = reviews[incident.id];
+  const review = storedReview?.snapshotId === snapshot.snapshotId ? storedReview : undefined;
   const currentStatus = statusFor(incident, review);
-  const evidencePackage = buildEvidencePackage(incident);
+  const diagnosticIncident = useMemo(
+    () => ({ ...incident, hypotheses }),
+    [incident, hypotheses],
+  );
+  const evidencePackage = useMemo(
+    () => ({
+      ...buildEvidencePackage(diagnosticIncident),
+      diagnosticSnapshot: snapshot,
+    }),
+    [diagnosticIncident, snapshot],
+  );
 
   useEffect(() => {
     const saved = window.localStorage.getItem("drivelens.reviews.v1");
@@ -265,9 +296,11 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
           window.clearInterval(timer);
           if (analysisPurpose === "supplement") {
             setEvidenceModes((modes) => ({ ...modes, [incident.id]: "scene_verified" }));
-            const verified = hypothesesForEvidence({ ...incident, hypotheses: baseHypotheses }, "scene_verified");
-            setSelectedHypothesisId(verified[0].id);
+            const verified = createDiagnosticSnapshot(incident, "scene_verified");
+            setSelectedHypothesisId(verified.hypotheses[0].id);
+            setDecision("needs_evidence");
             setAgentMode("补证改判");
+            setDemoStage(3);
           }
           setAnalysisState("complete");
           setToast(analysisPurpose === "supplement" ? "新增证据已改变支持与反证关系，疑因排序已更新" : "证据已重新对齐，疑因排序完成");
@@ -277,7 +310,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
       });
     }, 360);
     return () => window.clearInterval(timer);
-  }, [activeAnalysisSteps.length, analysisPurpose, analysisState, baseHypotheses, incident]);
+  }, [activeAnalysisSteps.length, analysisPurpose, analysisState, incident]);
 
   useEffect(() => {
     if (!toast) return;
@@ -286,13 +319,19 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   }, [toast]);
 
   const selectIncident = (next: Incident) => {
+    const nextMode = evidenceModes[next.id] ?? "logs_only";
+    const nextSnapshot = createDiagnosticSnapshot(next, nextMode);
     setSelectedId(next.id);
-    setSelectedHypothesisId(next.hypotheses[0].id);
-    setDecision(reviews[next.id]?.decision ?? "needs_evidence");
-    setNote(reviews[next.id]?.note ?? "");
+    setSelectedHypothesisId(nextSnapshot.hypotheses[0].id);
+    const nextReview = reviews[next.id]?.snapshotId === nextSnapshot.snapshotId
+      ? reviews[next.id]
+      : undefined;
+    setDecision(nextReview?.decision ?? "needs_evidence");
+    setNote(nextReview?.note ?? "");
     setAnalysisState("complete");
     setAnalysisPurpose("diagnosis");
-    setAgentMode(evidenceModes[next.id] === "scene_verified" ? "补证改判" : "证据模式");
+    setAgentMode(nextMode === "scene_verified" ? "补证改判" : "证据模式");
+    setDemoStage(1);
   };
 
   const toggleSignal = (key: SignalKey) => setActiveSignals((current) => {
@@ -309,13 +348,21 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
       const response = await fetch("/api/diagnose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: requestEventId }),
+        body: JSON.stringify({ eventId: requestEventId, evidenceMode }),
       });
       if (!response.ok) throw new Error(`diagnose_${response.status}`);
       const payload = (await response.json()) as DiagnoseResponse;
-      if (!Array.isArray(payload.hypotheses) || payload.hypotheses.length !== 3) throw new Error("invalid_diagnosis");
-      setRuntimeHypotheses((current) => ({ ...current, [requestEventId]: payload.hypotheses }));
-      if (requestEventId === selectedId) setSelectedHypothesisId(payload.hypotheses[0].id);
+      if (
+        payload.snapshot.eventId !== requestEventId ||
+        payload.snapshot.snapshotId !== snapshot.snapshotId ||
+        payload.snapshot.hypotheses.length !== 3
+      ) {
+        throw new Error("invalid_diagnosis_snapshot");
+      }
+      if (requestEventId === selectedId) {
+        setSelectedHypothesisId(payload.snapshot.hypotheses[0].id);
+        setDemoStage(2);
+      }
       setAgentMode(payload.mode === "model-enhanced" ? "模型增强" : "证据模式");
     } catch {
       setAgentMode("证据模式");
@@ -331,10 +378,12 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
 
   const resetEvidence = () => {
     setEvidenceModes((current) => ({ ...current, [incident.id]: "logs_only" }));
-    const initial = hypothesesForEvidence({ ...incident, hypotheses: baseHypotheses }, "logs_only");
-    setSelectedHypothesisId(initial[0].id);
+    const initial = createDiagnosticSnapshot(incident, "logs_only");
+    setSelectedHypothesisId(initial.hypotheses[0].id);
+    setDecision("needs_evidence");
     setAnalysisPurpose("diagnosis");
     setAgentMode("证据模式");
+    setDemoStage(2);
     setToast("已撤回现场补证，恢复仅日志视角");
   };
 
@@ -346,6 +395,9 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventId: incident.id,
+          evidenceMode: snapshot.mode,
+          snapshotId: snapshot.snapshotId,
+          selectedHypothesisId: selectedHypothesis.id,
           replayUrl: window.location.href,
           review: {
             status: decision === "confirmed" ? "已核验" : decision === "rejected" ? "重新研判" : "补证中",
@@ -370,6 +422,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
         window.localStorage.setItem(outboxKey, JSON.stringify(nextOutbox));
       }
       setSyncOpen(false);
+      setDemoStage(4);
       setToast(payload.mode === "feishu-card" ? `飞书事件表与群卡片均已送达 · ${payload.recordId}` : payload.mode === "bitable-only" ? `已写入飞书事件表，群卡片待发送 · ${payload.recordId}` : "飞书未配置，事件已进入本地待同步队列");
     } catch {
       setToast("同步请求失败；本地核验结论仍已保留");
@@ -379,12 +432,18 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   };
 
   const saveReview = () => {
+    if (decision === "confirmed" && !snapshot.gate.canConfirm) {
+      setDecision("needs_evidence");
+      setToast("证据门禁未通过：只能补证、驳回或转专业排查");
+      return;
+    }
     const taskId = decision === "confirmed" ? `DL-TEST-${incident.id.slice(-3)}` : undefined;
     const record: ReviewRecord = {
       decision,
       hypothesisId: selectedHypothesis.id,
       note: note.trim() || (decision === "confirmed" ? "已完成证据核验，进入修复复测。" : "待补充证据后继续核验。"),
       updatedAt: new Date().toISOString(),
+      snapshotId: snapshot.snapshotId,
       taskId,
     };
     const nextReviews = { ...reviews, [incident.id]: record };
@@ -397,17 +456,17 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
     window.localStorage.removeItem("drivelens.reviews.v1");
     window.localStorage.removeItem("drivelens.feishu-outbox.v1");
     setReviews({});
-    setRuntimeHypotheses({});
     setEvidenceModes({});
     setAnalysisPurpose("diagnosis");
     setAgentMode("证据模式");
     setSelectedId(incidents[0].id);
-    setSelectedHypothesisId(incidents[0].hypotheses[0].id);
+    setSelectedHypothesisId(createDiagnosticSnapshot(incidents[0], "logs_only").hypotheses[0].id);
     setDecision("needs_evidence");
     setNote("");
     setAnalysisState("complete");
     setAnalysisProgress(diagnosisSteps.length);
     setSyncOpen(false);
+    setDemoStage(1);
     setToast("演示状态已重置");
   };
 
@@ -422,13 +481,51 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
     setToast("异常证据包已导出");
   };
 
+  const jumpToStage = (stage: DemoStage) => {
+    setDemoStage(stage);
+    if (stage === 4) {
+      setSyncOpen(true);
+      return;
+    }
+    const workbench = document.querySelector<HTMLElement>(".evidence-workbench");
+    if (stage === 3) {
+      document.getElementById("evidence-challenge")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    } else {
+      workbench?.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell demo-stage-${demoStage}`}>
       <header className="topbar">
         <div className="brand-block"><span className="brand-mark">DL</span><div><strong>DriveLens</strong><small>无人车异常行为诊断工具箱</small></div></div>
-        <div className="topbar-center"><span className="mode-pill"><i /> 佑驾创新命题 · 合成数据演示</span><span className="boundary-copy">AI 只排序疑因，根因须由工程师核验</span></div>
-        <div className="topbar-actions"><button className="ghost-button" type="button" onClick={resetDemo}>重置演示</button><button className="primary-button compact" type="button" onClick={() => setSyncOpen(true)}>生成飞书事件卡</button></div>
+        <div className="topbar-center"><span className="mode-pill"><i /> 佑驾创新 · AI + 研发创新</span><span className="boundary-copy">确定性证据计分 · 模型只做解释 · 人工最终确认</span></div>
+        <div className="topbar-actions"><button className="ghost-button" type="button" onClick={resetDemo}>重置</button><button className="primary-button compact" type="button" onClick={() => jumpToStage(4)}>进入工程协同</button></div>
       </header>
+
+      <section className="pitch-strip" aria-label="比赛讲解导览">
+        <div className="pitch-copy">
+          <span>一句模糊异常</span>
+          <strong>在 2 分钟内变成可回放、可反驳、可协同的工程证据链</strong>
+          <small>演示使用脱敏合成数据；指标证明原型机制，不外推真实道路效果。</small>
+        </div>
+        <nav className="demo-progress" aria-label="四步讲解模式">
+          {demoStages.map((stage) => (
+            <button
+              key={stage.id}
+              type="button"
+              className={cx(demoStage === stage.id && "active", demoStage > stage.id && "done")}
+              onClick={() => jumpToStage(stage.id)}
+            >
+              <i>{demoStage > stage.id ? "✓" : stage.id}</i>
+              <span>{stage.label}</span>
+            </button>
+          ))}
+        </nav>
+      </section>
 
       <div className="workspace">
         <aside className="incident-sidebar">
@@ -451,14 +548,15 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
         <main className="evidence-workbench">
           <section className="incident-hero">
             <div className="hero-copy">
-              <div className="hero-meta"><span className={cx("risk-label", riskTone(incident.risk))}>{incident.risk}风险</span><span>{incident.id}</span><span>{incident.happenedAt}</span><span>{incident.vehicle}</span><span>{incident.version}</span></div>
+              <div className="hero-meta"><span className={cx("risk-label", riskTone(incident.risk))}>{incident.risk}风险</span><span>{incident.id}</span><span>{incident.happenedAt}</span><span>{incident.vehicle}</span><span>{incident.version}</span><span>{snapshot.mode === "scene_verified" ? "证据 V1" : "证据 L0"}</span></div>
               <h1>{incident.title}</h1><p>{incident.scene}</p>
             </div>
-            <div className="hero-actions"><button className="secondary-button" type="button" onClick={exportPackage}>导出证据包</button><button className="primary-button" type="button" onClick={runDiagnosis} disabled={analysisState === "running"} data-testid="run-diagnosis">{analysisState === "running" ? "正在研判…" : "重新运行可信诊断"}</button></div>
+            <div className="hero-actions"><button className="primary-button" type="button" onClick={runDiagnosis} disabled={analysisState === "running"} data-testid="run-diagnosis">{analysisState === "running" ? "正在重建证据链…" : "复现当前证据研判"}</button></div>
           </section>
 
           <section className="fact-strip" aria-label="已观测事实">
-            {incident.facts.map((fact) => <article key={fact.label}><span>{fact.label}</span><strong>{fact.value}</strong><small>{fact.detail}</small></article>)}
+            {incident.facts.slice(0, 3).map((fact) => <article key={fact.label}><span>{fact.label}</span><strong>{fact.value}</strong><small>{fact.detail}</small></article>)}
+            <article className={cx("coverage-fact", snapshot.gate.canConfirm && "passed")}><span>证据覆盖</span><strong>{snapshot.evidence.availableSlots}/{snapshot.evidence.totalSlots}</strong><small>{snapshot.evidence.completeness}% · 确认门槛 {snapshot.evidence.thresholdPercent}%</small></article>
           </section>
 
           <section className="evidence-card">
@@ -471,30 +569,34 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
             <SignalChart key={incident.id} incident={incident} activeSignals={activeSignals} />
             <div className="rule-row">
               <div className="trigger-summary"><span>触发规则</span><strong>{incident.rule}</strong><small>{incident.trigger}</small></div>
-              <div className="rule-hits">{rules.map((rule) => <span key={rule.id} className={cx(rule.hit && "hit")}>{rule.hit ? "✓" : "—"} {rule.title} {rule.value}{rule.unit}</span>)}</div>
+              <div className="rule-hits">{rules.filter((rule) => rule.hit).map((rule) => <span key={rule.id} className="hit">✓ {rule.title} {rule.value}{rule.unit}</span>)}</div>
             </div>
           </section>
 
-          <EvidenceChallenge incident={incident} mode={evidenceMode} onSupplement={supplementEvidence} onReset={resetEvidence} />
+          <EvidenceChallenge incident={incident} snapshot={snapshot} onSupplement={supplementEvidence} onReset={resetEvidence} />
 
-          <section className="timeline-card">
-            <div className="section-heading compact-heading"><div><span className="eyebrow">关键时间线</span><h2>事实按发生顺序排列</h2></div><span className="fact-only">仅陈述观测，不自动归因</span></div>
+          <details className="timeline-card">
+            <summary className="section-heading compact-heading"><div><span className="eyebrow">关键时间线</span><h2>展开 4 个事实节点</h2></div><span className="fact-only">仅观测，不自动归因</span></summary>
             <div className="timeline">{incident.timeline.map((item) => <article key={`${incident.id}-${item.t}`}><span className={cx("timeline-dot", item.tone)} /><time>t={item.t > 0 ? "+" : ""}{item.t}s</time><strong>{item.title}</strong><small>{item.detail}</small></article>)}</div>
-          </section>
+          </details>
 
-          <DiagnosticDepthPanel incident={incident} />
+          <DiagnosticDepthPanel incident={incident} snapshot={snapshot} />
         </main>
 
-        <aside className="diagnosis-panel">
+        <aside className="diagnosis-panel" id="diagnosis-panel">
           <div className="diagnosis-head"><div><span className="eyebrow">可信诊断 Agent</span><h2>候选原因与证据链</h2></div><span className="agent-mode">{agentMode}</span></div>
           {analysisState === "running" ? (
             <div className="analysis-progress" data-testid="analysis-progress"><div className="scanner"><i /></div><strong>正在重建异常证据链</strong><div className="analysis-steps">{activeAnalysisSteps.map((step, index) => <span key={step} className={cx(index < analysisProgress && "done", index === analysisProgress && "active")}><i>{index < analysisProgress ? "✓" : index + 1}</i>{step}</span>)}</div></div>
           ) : (
             <>
-              <div className="trust-notice"><strong>输出边界</strong><span>以下分数是证据匹配度，不是根因概率。</span></div>
+              <div className="trust-notice"><strong>输出边界 · {snapshot.scoringVersion}</strong><span>以下分数是证据匹配度，不是根因概率；模型不能改分。</span></div>
               <div className="hypothesis-list">{hypotheses.map((hypothesis) => <HypothesisCard key={hypothesis.id} hypothesis={hypothesis} selected={hypothesis.id === selectedHypothesis.id} onSelect={() => setSelectedHypothesisId(hypothesis.id)} />)}</div>
               <div className="hypothesis-detail">
                 <p>{selectedHypothesis.summary}</p>
+                <div className="score-ledger">
+                  <div><span>证据贡献账本</span><strong>{selectedHypothesis.priorScore} + {selectedHypothesis.supportPoints} − {selectedHypothesis.counterPoints} = {selectedHypothesis.score}</strong></div>
+                  <ul>{selectedHypothesis.contributions.map((item) => <li key={`${selectedHypothesis.id}-${item.evidenceId}`} className={item.polarity}><span>{item.source} · {item.evidenceTitle}</span><b>{item.signedPoints > 0 ? "+" : ""}{item.signedPoints}</b><small>{item.rationale}</small></li>)}</ul>
+                </div>
                 <div className="evidence-detail-grid">
                   <section className="support-block"><h3>支持证据</h3><ul>{selectedHypothesis.support.map((item) => <li key={item}>{item}</li>)}</ul></section>
                   <section className="counter-block"><h3>反证</h3><ul>{selectedHypothesis.counterEvidence.map((item) => <li key={item}>{item}</li>)}</ul></section>
@@ -502,12 +604,16 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
                 </div>
                 <div className="next-action"><span>建议核验动作</span><strong>{selectedHypothesis.action}</strong></div>
               </div>
-              <div className="review-box">
+              <div className={cx("gate-panel", snapshot.gate.canConfirm ? "passed" : "blocked")}>
+                <div><span>证据门禁</span><strong>{snapshot.gate.canConfirm ? "已通过 · 可由工程师确认" : "未通过 · 系统禁止确认"}</strong></div>
+                <small>{snapshot.gate.canConfirm ? snapshot.gate.message : snapshot.gate.blockers.map(gateBlockerLabel).join("；")}</small>
+              </div>
+              <div className="review-box" id="review-workflow">
                 <div className="review-heading"><div><span className="eyebrow">人工核验</span><h3>{currentStatus}</h3></div>{review?.taskId && <span className="task-id">{review.taskId}</span>}</div>
-                <div className="decision-segment" role="group" aria-label="核验结论"><button type="button" className={cx(decision === "confirmed" && "active")} onClick={() => setDecision("confirmed")}>确认疑因</button><button type="button" className={cx(decision === "rejected" && "active")} onClick={() => setDecision("rejected")}>驳回</button><button type="button" className={cx(decision === "needs_evidence" && "active")} onClick={() => setDecision("needs_evidence")}>需补证</button></div>
+                <div className="decision-segment" role="group" aria-label="核验结论"><button type="button" disabled={!snapshot.gate.canConfirm} title={!snapshot.gate.canConfirm ? "需先通过证据门禁" : undefined} className={cx(decision === "confirmed" && "active")} onClick={() => setDecision("confirmed")}>确认疑因</button><button type="button" className={cx(decision === "rejected" && "active")} onClick={() => setDecision("rejected")}>驳回</button><button type="button" className={cx(decision === "needs_evidence" && "active")} onClick={() => setDecision("needs_evidence")}>需补证</button></div>
                 <label>核验备注<textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：复现后确认目标ID短时重建，触发保护性停车。" rows={3} /></label>
-                <button className="primary-button full" type="button" onClick={saveReview} data-testid="save-review">保存结论并生成复测任务</button>
-                <small className="local-first">本地先保存；飞书接口不可用时不影响演示。</small>
+                <button className="primary-button full" type="button" onClick={saveReview} data-testid="save-review">{decision === "confirmed" ? "确认并生成复测任务" : decision === "rejected" ? "保存驳回并重新研判" : "保存补证任务"}</button>
+                <small className="local-first">结论绑定快照 {snapshot.mode === "scene_verified" ? "V1" : "L0"}；证据变化后旧结论自动失效。</small>
               </div>
             </>
           )}
@@ -518,10 +624,12 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
         <div className="drawer-backdrop" role="presentation" onMouseDown={() => setSyncOpen(false)}>
           <section className="sync-drawer" role="dialog" aria-modal="true" aria-label="飞书事件卡" onMouseDown={(event) => event.stopPropagation()}>
             <div className="drawer-head"><div><span className="eyebrow">飞书多维表格</span><h2>异常诊断卡已准备</h2></div><button type="button" onClick={() => setSyncOpen(false)} aria-label="关闭飞书异常诊断卡">×</button></div>
-            <div className="sync-status"><i /> 本地事件已保存，等待飞书凭证</div>
-            <p>接入企业自建应用后，将按固定字段写入“异常事件”表；未配置凭证时可直接导出同结构 JSON。</p>
-            <dl className="payload-preview"><div><dt>事件ID</dt><dd>{incident.id}</dd></div><div><dt>异常类型</dt><dd>{incident.title}</dd></div><div><dt>风险等级</dt><dd>{incident.risk === "高" ? "P1" : "P2"}</dd></div><div><dt>核验状态</dt><dd>{currentStatus}</dd></div><div><dt>候选原因Top3</dt><dd>{hypotheses.map((item) => item.title).join(" / ")}</dd></div><div><dt>缺失证据</dt><dd>{selectedHypothesis.missing.join("；")}</dd></div></dl>
+            <div className="sync-status"><i /> 同一诊断快照将贯穿工程协同</div>
+            <div className="workflow-path"><span>1 异常事件表</span><i>→</i><span>2 核验群卡</span><i>→</i><span>3 复测任务</span></div>
+            <p>服务端会按事件与证据版本重新生成快照；版本不一致返回 409，证据门禁未通过时拒绝写入“已核验”。</p>
+            <dl className="payload-preview"><div><dt>事件ID</dt><dd>{incident.id}</dd></div><div><dt>快照ID</dt><dd>{snapshot.snapshotId}</dd></div><div><dt>证据覆盖</dt><dd>{snapshot.evidence.availableSlots}/{snapshot.evidence.totalSlots} · {snapshot.evidence.completeness}%</dd></div><div><dt>证据门禁</dt><dd>{snapshot.gate.canConfirm ? "可人工确认" : "禁止确认根因"}</dd></div><div><dt>核验状态</dt><dd>{currentStatus}</dd></div><div><dt>候选原因Top3</dt><dd>{hypotheses.map((item) => `${item.title} ${item.score}`).join(" / ")}</dd></div><div><dt>当前缺失证据</dt><dd>{selectedHypothesis.missing.join("；") || "关键槽位已补齐"}</dd></div></dl>
             <div className="drawer-actions"><button className="secondary-button" type="button" onClick={exportPackage}>导出 JSON</button><button className="primary-button" type="button" onClick={syncFeishu} disabled={syncing}>{syncing ? "正在同步…" : "同步到飞书 / 本地队列"}</button></div>
+            <small className="drawer-boundary">未配置企业凭证时只生成本地待发送载荷，不伪装远程成功；群卡仅提供回放入口，人工结论在多维表格完成。</small>
           </section>
         </div>
       )}

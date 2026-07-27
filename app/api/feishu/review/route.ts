@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import { incidents } from "../../../lib/demo-data";
+import {
+  createDiagnosticSnapshot,
+  type EvidenceMode,
+} from "../../../lib/diagnostic-snapshot";
 
 const reviewActions = ["accept_top1", "request_evidence", "escalate"] as const;
 type ReviewAction = (typeof reviewActions)[number];
@@ -10,6 +15,8 @@ const reviewActionAliases = {
 
 interface ReviewRequest {
   eventId?: unknown;
+  evidenceMode?: unknown;
+  snapshotId?: unknown;
   recordId?: unknown;
   action?: unknown;
   topCause?: unknown;
@@ -21,6 +28,8 @@ interface ReviewRequest {
 
 interface ParsedReview {
   eventId: string;
+  evidenceMode: EvidenceMode;
+  snapshotId?: string;
   recordId?: string;
   action: ReviewAction;
   topCause?: string;
@@ -69,6 +78,8 @@ function parseReview(body: ReviewRequest): { review: ParsedReview } | { error: s
   return {
     review: {
       eventId,
+      evidenceMode: body.evidenceMode === "scene_verified" ? "scene_verified" : "logs_only",
+      snapshotId: text(body.snapshotId, 160),
       recordId: text(body.recordId, 120),
       action,
       topCause,
@@ -128,6 +139,31 @@ export async function POST(request: Request) {
   const parsed = parseReview(rawBody as ReviewRequest);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
+  const incident = incidents.find((item) => item.id === parsed.review.eventId);
+  if (!incident) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
+  const snapshot = createDiagnosticSnapshot(incident, parsed.review.evidenceMode);
+  if (parsed.review.snapshotId && parsed.review.snapshotId !== snapshot.snapshotId) {
+    return NextResponse.json(
+      { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
+      { status: 409 },
+    );
+  }
+  if (parsed.review.action === "accept_top1" && !snapshot.gate.canConfirm) {
+    return NextResponse.json(
+      { error: "evidence_gate_blocked", blockers: snapshot.gate.blockers },
+      { status: 422 },
+    );
+  }
+  if (
+    parsed.review.action === "accept_top1" &&
+    parsed.review.topCause !== snapshot.hypotheses[0]?.title
+  ) {
+    return NextResponse.json(
+      { error: "top_cause_mismatch", expectedTopCause: snapshot.hypotheses[0]?.title },
+      { status: 409 },
+    );
+  }
+
   const fieldPayload = buildReviewFields(parsed.review);
   const appId = process.env.FEISHU_APP_ID;
   const appSecret = process.env.FEISHU_APP_SECRET;
@@ -140,6 +176,8 @@ export async function POST(request: Request) {
       {
         mode: "local-review-payload",
         eventId: parsed.review.eventId,
+        snapshotId: snapshot.snapshotId,
+        evidenceGate: snapshot.gate.state,
         recordId: parsed.review.recordId ?? null,
         action: parsed.review.action,
         fields: fieldPayload.selectedFields,
@@ -192,6 +230,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       mode: "feishu",
       eventId: parsed.review.eventId,
+      snapshotId: snapshot.snapshotId,
       recordId: updatePayload.data?.record?.record_id ?? parsed.review.recordId,
       action: parsed.review.action,
       fields: fieldPayload.selectedFields,

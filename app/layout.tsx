@@ -12,9 +12,9 @@ export const metadata: Metadata = {
     title,
     description,
     type: "website",
-    images: [{ url: "/og.png", width: 1731, height: 909, alt: "DriveLens 无人车异常行为诊断工具箱" }],
+    images: [{ url: "/og-v2.png", width: 1731, height: 909, alt: "DriveLens 无人车异常行为诊断工具箱" }],
   },
-  twitter: { card: "summary_large_image", title, description, images: ["/og.png"] },
+  twitter: { card: "summary_large_image", title, description, images: ["/og-v2.png"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
