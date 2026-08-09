@@ -114,3 +114,28 @@ test("competition-only modules have complete presentation styles", async () => {
     assert.match(css, new RegExp("\\." + className + "\\b"));
   }
 });
+
+test("Feishu AI layer provides grounded chat, evidence tasks, and cited knowledge", async () => {
+  const [app, component, intelligence, route, docs, css] = await Promise.all([
+    read("app/DriveLensApp.tsx"),
+    read("app/components/FeishuAICopilot.tsx"),
+    read("app/lib/feishu-ai.ts"),
+    read("app/api/feishu-ai/route.ts"),
+    read("docs/FEISHU_AI_INTEGRATION.md"),
+    read("app/drivelens.css"),
+  ]);
+  assert.match(app, /FeishuAICopilot/);
+  assert.match(component, /对话式诊断/);
+  assert.match(component, /自动补证/);
+  assert.match(component, /知识引用/);
+  assert.match(intelligence, /diagnostic_snapshot/);
+  assert.match(intelligence, /knowledge_document/);
+  assert.match(intelligence, /buildEvidenceTasks/);
+  assert.match(intelligence, /不能改分、改排序或越过证据门禁/);
+  assert.match(route, /body\.snapshotId !== snapshot\.snapshotId/);
+  assert.match(route, /local-task-outbox/);
+  assert.match(route, /records\/batch_create/);
+  assert.match(docs, /Aily/);
+  assert.match(docs, /搜索 Wiki/);
+  assert.match(css, /\.ai-copilot\b/);
+});

@@ -12,6 +12,7 @@ import {
 } from "./lib/demo-data";
 import EvidenceChallenge from "./components/EvidenceChallenge";
 import DiagnosticDepthPanel from "./components/DiagnosticDepthPanel";
+import FeishuAICopilot from "./components/FeishuAICopilot";
 import {
   createDiagnosticSnapshot,
   gateBlockerLabel,
@@ -56,7 +57,7 @@ const demoStages: Array<{ id: DemoStage; label: string }> = [
   { id: 1, label: "现场还原" },
   { id: 2, label: "疑因竞争" },
   { id: 3, label: "补证改判" },
-  { id: 4, label: "工程协同" },
+  { id: 4, label: "飞书AI协同" },
 ];
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -249,6 +250,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   const [analysisPurpose, setAnalysisPurpose] = useState<AnalysisPurpose>("diagnosis");
   const [agentMode, setAgentMode] = useState<"证据模式" | "模型增强" | "补证改判">("证据模式");
   const [syncOpen, setSyncOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [demoStage, setDemoStage] = useState<DemoStage>(1);
@@ -466,6 +468,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
     setAnalysisState("complete");
     setAnalysisProgress(diagnosisSteps.length);
     setSyncOpen(false);
+    setAiOpen(false);
     setDemoStage(1);
     setToast("演示状态已重置");
   };
@@ -484,7 +487,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   const jumpToStage = (stage: DemoStage) => {
     setDemoStage(stage);
     if (stage === 4) {
-      setSyncOpen(true);
+      setAiOpen(true);
       return;
     }
     const workbench = document.querySelector<HTMLElement>(".evidence-workbench");
@@ -503,7 +506,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
       <header className="topbar">
         <div className="brand-block"><span className="brand-mark">DL</span><div><strong>DriveLens</strong><small>无人车异常行为诊断工具箱</small></div></div>
         <div className="topbar-center"><span className="mode-pill"><i /> 佑驾创新 · AI + 研发创新</span><span className="boundary-copy">确定性证据计分 · 模型只做解释 · 人工最终确认</span></div>
-        <div className="topbar-actions"><button className="ghost-button" type="button" onClick={resetDemo}>重置</button><button className="primary-button compact" type="button" onClick={() => jumpToStage(4)}>进入工程协同</button></div>
+        <div className="topbar-actions"><button className="ghost-button" type="button" onClick={resetDemo}>重置</button><button className="primary-button compact ai-entry-button" type="button" onClick={() => jumpToStage(4)}><span>AI</span> 飞书AI协同</button></div>
       </header>
 
       <section className="pitch-strip" aria-label="比赛讲解导览">
@@ -619,6 +622,22 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
           )}
         </aside>
       </div>
+
+      <FeishuAICopilot
+        key={snapshot.snapshotId}
+        open={aiOpen}
+        incident={incident}
+        snapshot={snapshot}
+        onClose={() => setAiOpen(false)}
+        onSupplement={() => {
+          setAiOpen(false);
+          supplementEvidence();
+        }}
+        onOpenSync={() => {
+          setAiOpen(false);
+          setSyncOpen(true);
+        }}
+      />
 
       {syncOpen && (
         <div className="drawer-backdrop" role="presentation" onMouseDown={() => setSyncOpen(false)}>
