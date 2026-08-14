@@ -1,11 +1,9 @@
 "use client";
 
 import type { Incident } from "../lib/demo-data";
-import {
-  createDiagnosticSnapshot,
-  gateBlockerLabel,
-  type DiagnosticSnapshot,
-} from "../lib/diagnostic-snapshot";
+import { createDiagnosticSnapshot, gateBlockerLabel, type DiagnosticSnapshot } from "../lib/diagnostic-snapshot";
+import EvidenceGateFlow from "./EvidenceGateFlow";
+import HypothesisReshuffle from "./HypothesisReshuffle";
 
 interface EvidenceChallengeProps {
   incident: Incident;
@@ -20,8 +18,9 @@ export default function EvidenceChallenge({
   onSupplement,
   onReset,
 }: EvidenceChallengeProps) {
-  const baseline = createDiagnosticSnapshot(incident, "logs_only");
-  const verified = createDiagnosticSnapshot(incident, "scene_verified");
+  const isRealCaseDerived = snapshot.source === "real_case_derived";
+  const baseline = isRealCaseDerived ? snapshot : createDiagnosticSnapshot(incident, "logs_only");
+  const verified = isRealCaseDerived ? snapshot : createDiagnosticSnapshot(incident, "scene_verified");
   const isVerified = snapshot.mode === "scene_verified";
 
   return (
@@ -35,21 +34,24 @@ export default function EvidenceChallenge({
           <span className="eyebrow">证据挑战 · 允许推翻第一次排序</span>
           <h2>{isVerified ? "新证据已改写疑因排序" : "当前结论尚未通过证据门禁"}</h2>
         </div>
-        <div className="challenge-metrics">
-          <div className="evidence-completeness" aria-label={`证据覆盖 ${snapshot.evidence.availableSlots} / ${snapshot.evidence.totalSlots}`}>
-            <span>证据覆盖</span>
-            <strong>{snapshot.evidence.availableSlots}/{snapshot.evidence.totalSlots}</strong>
-            <small>{snapshot.evidence.completeness}% · 门槛 {snapshot.evidence.thresholdPercent}%</small>
-            <i><b style={{ width: `${snapshot.evidence.completeness}%` }} /></i>
-          </div>
-          <div className={`gate-badge ${snapshot.gate.canConfirm ? "passed" : "blocked"}`}>
-            <span>证据门禁</span>
-            <strong>{snapshot.gate.canConfirm ? "可进入人工确认" : "禁止确认根因"}</strong>
-          </div>
-        </div>
       </div>
 
-      {!isVerified ? (
+      <EvidenceGateFlow snapshot={snapshot} />
+
+      {isRealCaseDerived ? (
+        <div className="challenge-before">
+          <div className="challenge-question">
+            <span>当前证据边界</span>
+            <strong>只有脱敏派生观察，不能模拟补证或确认根因</strong>
+            <small>需补齐原始时序、附件正文和独立工程师复核。</small>
+          </div>
+          <button className="challenge-button" type="button" disabled>
+            <span>!</span>
+            <strong>等待可核验原始证据</strong>
+            <small>系统不会把派生观察伪装成现场补证</small>
+          </button>
+        </div>
+      ) : !isVerified ? (
         <div className="challenge-before">
           <div className="challenge-question">
             <span>待核验问题</span>
@@ -57,32 +59,17 @@ export default function EvidenceChallenge({
             <small>{snapshot.gate.blockers.slice(0, 2).map(gateBlockerLabel).join(" · ")}</small>
           </div>
           <button className="challenge-button" type="button" onClick={onSupplement} data-testid="supplement-evidence">
-            <span>＋</span>
+            <span>+</span>
             <strong>补入 {verified.evidence.supplementalItems.length} 项已标注现场证据</strong>
             <small>每项证据明确支持谁、反驳谁、改变多少分</small>
           </button>
         </div>
       ) : (
         <>
-          <div className="ranking-shift" aria-label="补证前后排名变化">
-            {baseline.hypotheses.map((before) => {
-              const after = verified.hypotheses.find((item) => item.id === before.id);
-              if (!after) return null;
-              const delta = after.score - before.score;
-              return (
-                <article key={before.id} className={delta > 0 ? "up" : delta < 0 ? "down" : ""}>
-                  <div><span>{before.title}</span><small>证据匹配度</small></div>
-                  <strong>{before.score}<i>→</i>{after.score}</strong>
-                  <b>{delta > 0 ? "+" : ""}{delta}</b>
-                </article>
-              );
-            })}
-            <article className="gate-shift">
-              <div><span>证据门禁</span><small>系统强制约束</small></div>
-              <strong>未通过<i>→</i>可核验</strong>
-              <b>PASS</b>
-            </article>
-          </div>
+          <HypothesisReshuffle
+            baseline={baseline}
+            verified={verified}
+          />
 
           <div className="supplemental-evidence-list">
             {snapshot.evidence.supplementalItems.map((item, index) => (
@@ -95,7 +82,7 @@ export default function EvidenceChallenge({
                     const target = snapshot.hypotheses.find((hypothesis) => hypothesis.id === itemEffect.hypothesisId);
                     return (
                       <em key={`${item.id}-${itemEffect.hypothesisId}`} className={itemEffect.polarity}>
-                        {itemEffect.polarity === "support" ? "支持" : "反证"} · {target?.title} {itemEffect.polarity === "support" ? "+" : "−"}{itemEffect.points}
+                        {itemEffect.polarity === "support" ? "支持" : "反证"} · {target?.title} {itemEffect.polarity === "support" ? "+" : "-"}{itemEffect.points}
                       </em>
                     );
                   })}

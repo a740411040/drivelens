@@ -22,7 +22,7 @@ export interface EvidenceTask {
   snapshotId: string;
   title: string;
   owner: string;
-  priority: "P0" | "P1" | "P2";
+  priority: "P0" | "P1" | "P2" | "待企业排期";
   evidenceSlot: string;
   acceptanceCriteria: string;
   rationale: string;
@@ -143,9 +143,16 @@ export function buildEvidenceTasks(
   incident: Incident,
   snapshot: DiagnosticSnapshot,
 ): EvidenceTask[] {
-  const candidates = snapshot.hypotheses
-    .slice(0, 2)
+  const hasDirections = snapshot.hypotheses.length > 0;
+  const hypothesisCandidates = snapshot.hypotheses
     .flatMap((hypothesis) => hypothesis.missing.map((slot) => ({ slot, owner: hypothesis.owner })));
+  const candidates = snapshot.source === "real_case_derived" && !hasDirections
+    ? [
+        { slot: "原始时序切片", owner: "系统平台组" },
+        { slot: "附件正文与关键帧", owner: "系统集成组" },
+        { slot: "独立工程复核记录", owner: "系统集成组" },
+      ]
+    : hypothesisCandidates;
   const unique = Array.from(new Map(candidates.map((item) => [item.slot, item])).values()).slice(0, 3);
 
   return unique.map((item, index) => ({
@@ -154,22 +161,31 @@ export function buildEvidenceTasks(
     snapshotId: snapshot.snapshotId,
     title: `补齐：${item.slot}`,
     owner: ownerForEvidence(item.slot, item.owner),
-    priority: incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2",
+    priority: snapshot.source === "real_case_derived" ? "待企业排期" : incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2",
     evidenceSlot: item.slot,
     acceptanceCriteria: acceptanceForEvidence(item.slot),
-    rationale: `当前Top2候选仍缺少“${item.slot}”，补齐后重新计算支持与反证关系。`,
+    rationale: snapshot.source === "real_case_derived" && !hasDirections
+      ? `当前暂无可成立核验方向；先补齐“${item.slot}”，再重新生成核验方向。`
+      : snapshot.source === "real_case_derived"
+        ? `当前不排序核验方向仍缺少“${item.slot}”，补齐原始证据后再进入因果研判。`
+      : `当前Top2候选仍缺少“${item.slot}”，补齐后重新计算支持与反证关系。`,
     status: "待分派",
   }));
 }
 
 function snapshotCitation(snapshot: DiagnosticSnapshot): KnowledgeCitation {
   const top = snapshot.hypotheses[0];
+  const noDirectionMessage = "暂无可成立核验方向，先补原始证据";
   return {
     id: snapshot.snapshotId,
     kind: "diagnostic_snapshot",
     title: `诊断快照 ${snapshot.mode === "scene_verified" ? "V1" : "L0"}`,
-    section: "Top3与证据门禁",
-    excerpt: `Top1 ${top?.title ?? "无"} ${top?.score ?? 0}分；覆盖${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}；门禁${snapshot.gate.canConfirm ? "通过" : "阻断"}。`,
+    section: snapshot.scoringAvailable ? "Top3与证据门禁" : "证据边界与门禁",
+    excerpt: !top
+      ? `${noDirectionMessage}；当前快照没有候选，终态为证据不足，门禁阻断。`
+      : snapshot.scoringAvailable
+        ? `Top1 ${top.title} ${top.score}分；覆盖${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}；门禁${snapshot.gate.canConfirm ? "通过" : "阻断"}。`
+        : `当前只有派生观察；核验方向不排序、不计分，终态为证据不足；门禁阻断。`,
     reference: `snapshot://${snapshot.snapshotId}`,
   };
 }
@@ -194,6 +210,7 @@ export function buildFeishuAIAnswer(
   snapshot: DiagnosticSnapshot,
   rawMessage: string,
 ): FeishuAIAnswer {
+  const noDirectionMessage = "暂无可成立核验方向，先补原始证据";
   const message = trimText(rawMessage) || `分析${incident.title}`;
   const intent = inferIntent(message);
   const top = snapshot.hypotheses[0];
@@ -204,14 +221,26 @@ export function buildFeishuAIAnswer(
   const citations = [snapshotCitation(snapshot), ...matchedKnowledge.map(knowledgeCitation)];
 
   let answer: string;
-  if (intent === "evidence_tasks") {
+  if (!top) {
+    answer = intent === "evidence_tasks"
+      ? snapshot.source === "real_case_derived"
+        ? `${noDirectionMessage}。我已将原始时序、附件正文与独立工程复核整理为${tasks.length}项补证任务；任务不带业务风险等级，需由企业工程师排期。`
+        : `${noDirectionMessage}。当前没有可自动生成的候选补证任务，请先补齐触发规则所需的原始证据。`
+      : intent === "knowledge"
+        ? `${noDirectionMessage}。按照《${matchedKnowledge[0]?.title ?? "异常行为诊断与人工确认 SOP"}》，应先核对${matchedKnowledge[0]?.section ?? "证据门禁"}；在原始证据接入前不能生成候选或确认根因。`
+        : `${noDirectionMessage}。现有信息不足以生成候选，也不允许归因；请先接入原始时序、附件正文与功能域关键字段。门禁阻断原因：${blockedReason(snapshot.gate.blockers)}。`;
+  } else if (intent === "evidence_tasks") {
     answer = snapshot.gate.canConfirm
       ? `当前快照已经通过证据门禁，但仍建议保留${tasks.length}项复核任务，用于修复后的回归验证。任务只引用当前快照，不会继承旧结论。`
-      : `当前结论不能确认。我已把Top2候选的缺失证据压缩为${tasks.length}项最小补证任务，并按证据类型路由到对应模块。门禁阻断原因：${blockedReason(snapshot.gate.blockers)}。`;
+      : snapshot.source === "real_case_derived"
+        ? `当前真实案例只能整理核验方向。我已把全部方向中的缺失证据去重为${tasks.length}项补证任务；这些任务没有业务风险优先级，需由企业工程师重新排期。`
+        : `当前结论不能确认。我已把Top2候选的缺失证据压缩为${tasks.length}项最小补证任务，并按证据类型路由到对应模块。门禁阻断原因：${blockedReason(snapshot.gate.blockers)}。`;
   } else if (intent === "knowledge") {
-    answer = `按照《${matchedKnowledge[0]?.title ?? "异常行为诊断与人工确认 SOP"}》，应先核对${matchedKnowledge[0]?.section ?? "证据门禁"}。结合当前${snapshot.mode === "scene_verified" ? "V1" : "L0"}快照，${snapshot.gate.canConfirm ? "可以进入人工确认，但最终根因仍由工程师签字" : `仍需补证，不能把${top?.title ?? "当前Top1"}直接写成根因`}。`;
+    answer = `按照《${matchedKnowledge[0]?.title ?? "异常行为诊断与人工确认 SOP"}》，应先核对${matchedKnowledge[0]?.section ?? "证据门禁"}。结合当前${snapshot.mode === "scene_verified" ? "V1" : "L0"}快照，${snapshot.gate.canConfirm ? "可以进入人工确认，但最终根因仍由工程师签字" : `仍需补证，不能把${top.title}直接写成根因`}。`;
   } else {
-    answer = `当前证据下，${top?.title ?? "暂无候选"}以${top?.score ?? 0}分暂列第一，但这是证据匹配度，不是根因概率。${snapshot.gate.canConfirm ? "证据门禁已通过，可交由工程师确认。" : `证据门禁仍阻断：${blockedReason(snapshot.gate.blockers)}。`}建议优先执行“${tasks[0]?.title ?? top?.action ?? "继续专业排查"}”，再用新证据重算，而不是让AI直接定责。`;
+    answer = snapshot.scoringAvailable
+      ? `当前证据下，${top.title}以${top.score}分暂列第一，但这是证据匹配度，不是根因概率。${snapshot.gate.canConfirm ? "证据门禁已通过，可交由工程师确认。" : `证据门禁仍阻断：${blockedReason(snapshot.gate.blockers)}。`}建议优先执行“${tasks[0]?.title ?? top.action}”，再用新证据重算，而不是让AI直接定责。`
+      : `当前案例只有脱敏派生观察，系统不计算排名或分数，也不允许归因。核验方向仅用于组织补证；门禁阻断原因：${blockedReason(snapshot.gate.blockers)}。建议先执行“${tasks[0]?.title ?? top.action}”。`;
   }
 
   return {
@@ -223,11 +252,17 @@ export function buildFeishuAIAnswer(
     answer,
     citations,
     tasks,
-    followups: [
-      "还缺哪些证据，应该分派给谁？",
-      "按照诊断SOP，现在为什么不能确认根因？",
-      "如果补入现场标注，哪些候选最可能发生变化？",
-    ],
+    followups: top
+      ? [
+        "还缺哪些证据，应该分派给谁？",
+        "按照诊断SOP，现在为什么不能确认根因？",
+        "如果补入现场标注，哪些核验方向可能发生变化？",
+      ]
+      : [
+        "需要先接入哪些原始证据？",
+        "按照诊断SOP，现在为什么不能生成核验方向？",
+        "补齐原始证据后，如何重新生成核验方向？",
+      ],
     guardrail: "回答只引用当前诊断快照与已登记知识条目；飞书AI不能改分、改排序或越过证据门禁。",
     integration: {
       aily: "adapter-ready",
@@ -236,4 +271,3 @@ export function buildFeishuAIAnswer(
     },
   };
 }
-

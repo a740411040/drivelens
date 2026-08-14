@@ -620,10 +620,26 @@ function buildThresholdSensitivity(
   });
 }
 
-export function createRobustnessCertificate(
+/** 单次扰动试验结果，供 UI 逐帧渲染 */
+export interface TrialResult {
+  trialIndex: number;
+  /** 本次试验检出结果是否与基准一致 */
+  detectedStable: boolean;
+  /** 本次试验 Top1 疑因是否与基准一致 */
+  top1Stable: boolean;
+  /** 本次试验 Top3 排序一致度（0~1） */
+  top3Agreement: number;
+}
+
+/**
+ * 生成器版本的蒙特卡洛扰动校验。
+ * 每次 yield 一个 TrialResult，最后 return 完整的 RobustnessCertificate。
+ * 供 UI 组件逐帧渲染 100 次试验的瀑布动画。
+ */
+export function* iterateRobustnessTrials(
   incident: Incident,
   options: RobustnessOptions = {},
-): RobustnessCertificate {
+): Generator<TrialResult, RobustnessCertificate> {
   const trials = Math.max(1, Math.min(2_000, Math.floor(options.trials ?? 100)));
   const seed = hashSeed(options.seed ?? `drivelens:${incident.id}:robustness-v1`);
   const perturbation = {
@@ -643,7 +659,7 @@ export function createRobustnessCertificate(
   const baselineTop3 = baselineRanking.slice(0, 3).map((item) => item.hypothesis.id);
   let detectionStable = 0;
   let top1Stable = 0;
-  let top3Agreement = 0;
+  let top3AgreementSum = 0;
 
   for (let trial = 0; trial < trials; trial += 1) {
     const perturbed = perturbPoints(incident.telemetry, random, perturbation);
@@ -652,9 +668,20 @@ export function createRobustnessCertificate(
     const trialTop3 = rankHypotheses(incident, perturbed)
       .slice(0, 3)
       .map((item) => item.hypothesis.id);
-    if (detected === baselineDetected) detectionStable += 1;
-    if (trialTop3[0] === baselineTop3[0]) top1Stable += 1;
-    top3Agreement += rankedTop3Agreement(baselineTop3, trialTop3);
+    const isDetectionStable = detected === baselineDetected;
+    const isTop1Stable = trialTop3[0] === baselineTop3[0];
+    const agreement = rankedTop3Agreement(baselineTop3, trialTop3);
+
+    if (isDetectionStable) detectionStable += 1;
+    if (isTop1Stable) top1Stable += 1;
+    top3AgreementSum += agreement;
+
+    yield {
+      trialIndex: trial,
+      detectedStable: isDetectionStable,
+      top1Stable: isTop1Stable,
+      top3Agreement: agreement,
+    };
   }
 
   return {
@@ -665,7 +692,7 @@ export function createRobustnessCertificate(
     baselineTop3,
     detectionStabilityRate: round(detectionStable / trials),
     top1StabilityRate: round(top1Stable / trials),
-    top3StabilityRate: round(top3Agreement / trials),
+    top3StabilityRate: round(top3AgreementSum / trials),
     criticalDependencies: buildSignalDependencies(
       incident,
       baselineDetected,
@@ -675,6 +702,18 @@ export function createRobustnessCertificate(
     perturbation,
     generatedBy: "deterministic_monte_carlo_v1",
   };
+}
+
+export function createRobustnessCertificate(
+  incident: Incident,
+  options: RobustnessOptions = {},
+): RobustnessCertificate {
+  const generator = iterateRobustnessTrials(incident, options);
+  let result = generator.next();
+  while (!result.done) {
+    result = generator.next();
+  }
+  return result.value;
 }
 
 function pushEvent(

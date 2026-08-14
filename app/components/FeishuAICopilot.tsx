@@ -179,9 +179,9 @@ export default function FeishuAICopilot({
         </header>
 
         <div className="ai-capability-strip" aria-label="飞书AI三项能力">
-          <article><i>01</i><div><strong>对话式诊断</strong><small>自然语言查询当前快照</small></div><b>已实现</b></article>
-          <article><i>02</i><div><strong>自动补证</strong><small>按证据类型路由任务</small></div><b>已实现</b></article>
-          <article><i>03</i><div><strong>知识引用</strong><small>回答绑定SOP与快照</small></div><b>已实现</b></article>
+          <article><i>01</i><div><strong>对话式诊断</strong><small>自然语言查询当前快照</small></div><b>本地可演示</b></article>
+          <article><i>02</i><div><strong>补证任务草稿</strong><small>按证据类型路由任务</small></div><b>本地可演示</b></article>
+          <article><i>03</i><div><strong>知识引用</strong><small>回答绑定SOP与快照</small></div><b>本地可演示</b></article>
         </div>
 
         <div className="ai-copilot-body">
@@ -232,7 +232,7 @@ export default function FeishuAICopilot({
           <aside className="ai-action-column">
             <div className="ai-action-head">
               <div><span className="eyebrow">自动行动</span><h3>{answer ? intentLabel[answer.intent] : "等待一次提问"}</h3></div>
-              <span className="adapter-badge">Aily接口就绪</span>
+              <span className="adapter-badge">Aily技能接口待租户配置</span>
             </div>
 
             <section className="ai-task-panel">
@@ -241,7 +241,7 @@ export default function FeishuAICopilot({
                 <div className="ai-task-list">
                   {answer.tasks.map((task) => (
                     <article key={task.id}>
-                      <div><span>{task.priority}</span><small>{task.owner}</small></div>
+                      <div><span className={task.priority === "待企业排期" ? "pending-schedule" : undefined}>{task.priority}</span><small>{task.owner}</small></div>
                       <strong>{task.title}</strong>
                       <p>{task.acceptanceCriteria}</p>
                       <code>{task.id}</code>
@@ -264,10 +264,10 @@ export default function FeishuAICopilot({
             </section>
 
             <div className="ai-action-buttons">
-              {!snapshot.gate.canConfirm && <button className="secondary-button" type="button" onClick={onSupplement}>进入补证改判演示</button>}
+              {!snapshot.gate.canConfirm && snapshot.capabilities.supplementalEvidence && <button className="secondary-button" type="button" onClick={onSupplement}>进入补证改判演示</button>}
               <button className="secondary-button" type="button" onClick={onOpenSync}>打开事件同步</button>
             </div>
-            <small className="ai-runtime-boundary">当前为本地可信适配器：三项能力可运行；企业Aily、知识库和任务表凭证配置后切换远程链路，未配置时只进入本地队列。</small>
+            <small className="ai-runtime-boundary">当前为本地可信适配器，可演示对话、补证任务草稿与本地知识引用；企业Aily、知识库和任务表仍待租户验收，未配置时只进入本地队列。</small>
           </aside>
         </div>
       </section>

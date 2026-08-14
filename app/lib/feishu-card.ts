@@ -24,15 +24,47 @@ export function buildIncidentReviewCard(
   options: { recordId?: string; replayUrl?: string } = {},
 ): FeishuInteractiveCard | null {
   const top = snapshot.hypotheses[0];
-  if (!top || snapshot.eventId !== incident.id) return null;
+  if (snapshot.eventId !== incident.id) return null;
   const recordId = options.recordId ?? "待创建";
   const replayUrl = options.replayUrl ?? "http://localhost:3001/";
   const gateLabel = snapshot.gate.canConfirm ? "可进入人工确认" : "仅可补证 / 转专业排查";
+  const isRealCase = snapshot.source === "real_case_derived";
+  const noDirectionMessage = "暂无可成立核验方向，先补原始证据";
+  const directionContent = top
+    ? snapshot.scoringAvailable
+      ? `**Top1 疑因（${top.score}/100）**\n${top.title}\n基线 ${top.priorScore} + 支持 ${top.supportPoints} − 反证 ${top.counterPoints}`
+      : `**不排序核验方向（不可计分）**\n${snapshot.hypotheses.map((item) => `- ${item.title}`).join("\n")}\n当前仅有派生观察，禁止写作已确认根因。`
+    : `**暂无可成立核验方向**\n${noDirectionMessage}。现有派生检查不足以生成候选，也不能据此归因。`;
+  const evidenceFields = top
+    ? isRealCase
+      ? [
+        { is_short: false, text: { tag: "lark_md", content: `**相关观测**\n${top.support.slice(0, 3).join("\n") || "暂无直接相关观测"}` } },
+        { is_short: false, text: { tag: "lark_md", content: `**未观测信息**\n${top.counterEvidence.slice(0, 3).join("\n") || "暂无可读未观测项"}` } },
+        { is_short: false, text: { tag: "lark_md", content: `**缺失字段 / 原始证据**\n${top.missing.join("、") || "仍缺原始时序、附件正文与独立工程复核"}` } },
+      ]
+      : [
+        { is_short: false, text: { tag: "lark_md", content: `**支持证据**\n${top.support.slice(0, 3).join("\n") || "暂无"}` } },
+        { is_short: false, text: { tag: "lark_md", content: `**反证 / 不确定性**\n${top.counterEvidence.slice(0, 3).join("\n") || "尚未完成反证评估"}` } },
+        { is_short: false, text: { tag: "lark_md", content: `**仍缺证据**\n${top.missing.join("、") || "关键槽位已补齐"}` } },
+      ]
+    : [
+      { is_short: false, text: { tag: "lark_md", content: "**当前状态**\n证据不足，未生成核验方向。" } },
+      {
+        is_short: false,
+        text: {
+          tag: "lark_md",
+          content: isRealCase
+            ? "**未接入信息**\n原始时序、附件正文与功能域关键字段。"
+            : "**缺失信息**\n当前快照未提供足以生成候选的证据。",
+        },
+      },
+      { is_short: false, text: { tag: "lark_md", content: `**建议动作**\n${noDirectionMessage}。` } },
+    ];
 
   return {
     config: { wide_screen_mode: true, enable_forward: true, update_multi: true },
     header: {
-      template: snapshot.gate.canConfirm ? "green" : incident.risk === "高" ? "red" : "orange",
+      template: isRealCase ? "blue" : snapshot.gate.canConfirm ? "green" : incident.risk === "高" ? "red" : "orange",
       title: { tag: "plain_text", content: `DriveLens · ${incident.title}` },
     },
     elements: [
@@ -40,8 +72,8 @@ export function buildIncidentReviewCard(
         tag: "div",
         fields: [
           { is_short: true, text: { tag: "lark_md", content: `**事件**\n${incident.id}` } },
-          { is_short: true, text: { tag: "lark_md", content: `**风险**\n${incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2"}` } },
-          { is_short: true, text: { tag: "lark_md", content: `**证据版本**\n${snapshot.mode === "scene_verified" ? "V1 现场补证" : "L0 仅日志"}` } },
+          { is_short: true, text: { tag: "lark_md", content: `**${isRealCase ? "数据状态" : "风险"}**\n${isRealCase ? "真实派生案例" : incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2"}` } },
+          { is_short: true, text: { tag: "lark_md", content: `**证据版本**\n${isRealCase ? "派生元数据" : snapshot.mode === "scene_verified" ? "V1 现场补证" : "L0 仅日志"}` } },
           { is_short: true, text: { tag: "lark_md", content: `**证据门禁**\n${gateLabel}` } },
         ],
       },
@@ -49,22 +81,20 @@ export function buildIncidentReviewCard(
         tag: "div",
         text: {
           tag: "lark_md",
-          content: `**Top1 疑因（${top.score}/100）**\n${top.title}\n基线 ${top.priorScore} + 支持 ${top.supportPoints} − 反证 ${top.counterPoints}`,
+          content: directionContent,
         },
       },
       {
         tag: "div",
-        fields: [
-          { is_short: false, text: { tag: "lark_md", content: `**支持证据**\n${top.support.slice(0, 3).join("\n") || "暂无"}` } },
-          { is_short: false, text: { tag: "lark_md", content: `**反证 / 不确定性**\n${top.counterEvidence.slice(0, 3).join("\n") || "尚未完成反证评估"}` } },
-          { is_short: false, text: { tag: "lark_md", content: `**仍缺证据**\n${top.missing.join("、") || "关键槽位已补齐"}` } },
-        ],
+        fields: evidenceFields,
       },
       {
         tag: "div",
         text: {
           tag: "lark_md",
-          content: `**证据覆盖** ${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）\n**快照ID** ${snapshot.snapshotId}`,
+          content: isRealCase
+            ? `**派生检查** ${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots} 项状态可读\n**原始证据** 未接入\n**快照ID** ${snapshot.snapshotId}`
+            : `**证据覆盖** ${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）\n**快照ID** ${snapshot.snapshotId}`,
         },
       },
       {

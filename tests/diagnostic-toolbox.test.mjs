@@ -139,3 +139,169 @@ test("Feishu AI layer provides grounded chat, evidence tasks, and cited knowledg
   assert.match(docs, /搜索 Wiki/);
   assert.match(css, /\.ai-copilot\b/);
 });
+
+test("real-case mode preserves evidence boundaries across UI and APIs", async () => {
+  const [app, boundary, resolver, realDiagnostic, challenge, depth, diagnose, feishu, feishuAi, card, css] = await Promise.all([
+    read("app/DriveLensApp.tsx"),
+    read("app/components/RealCaseBoundaryNotice.tsx"),
+    read("app/lib/incident-resolver.ts"),
+    read("app/lib/real-diagnostic.ts"),
+    read("app/components/EvidenceChallenge.tsx"),
+    read("app/components/DiagnosticDepthPanel.tsx"),
+    read("app/api/diagnose/route.ts"),
+    read("app/api/feishu/route.ts"),
+    read("app/api/feishu-ai/route.ts"),
+    read("app/lib/feishu-card.ts"),
+    read("app/drivelens.css"),
+  ]);
+  assert.match(app, /真实 RCA 派生案例/);
+  assert.match(app, /不排序核验方向/);
+  assert.match(boundary, /原始时序、附件正文与独立金标未接入/);
+  assert.match(resolver, /real_case_derived/);
+  assert.match(realDiagnostic, /raw_evidence_missing/);
+  assert.match(realDiagnostic, /scoring_unavailable/);
+  assert.match(realDiagnostic, /evidence-boundary-v1/);
+  assert.doesNotMatch(realDiagnostic, /matchObservations: \["insufficient_fields"\]/);
+  assert.doesNotMatch(realDiagnostic, /确保至少返回 2 个疑因/);
+  assert.match(challenge, /不能模拟补证/);
+  assert.match(depth, /当前不可计算/);
+  assert.match(diagnose, /resolveIncident/);
+  assert.match(feishu, /resolveIncident/);
+  assert.match(feishu, /attemptsAttribution/);
+  assert.match(feishu, /selected\?\.action/);
+  assert.match(feishuAi, /resolveIncident/);
+  assert.match(feishuAi, /no-task-required/);
+  assert.match(card, /不排序核验方向/);
+  assert.match(card, /暂无可成立核验方向/);
+  assert.match(app, /事实检查相对窗口/);
+  assert.match(app, /相关观测/);
+  assert.match(app, /未观测信息/);
+  assert.match(app, /缺失字段/);
+  assert.match(app, /结论已过期/);
+  assert.match(app, /reviewForSnapshot/);
+  assert.match(css, /\.compact-case-navigator/);
+  assert.match(css, /@media \(min-width: 1181px\) and \(max-height: 760px\)/);
+  assert.match(css, /\.ai-copilot-body \{\s*display: block;/s);
+  assert.doesNotMatch(css, /html, body \{[^}]*min-width: 1024px/s);
+});
+
+test("real-case snapshots expose time, priority, and no-candidate boundary contracts", async () => {
+  const realDiagnostic = await read("app/lib/real-diagnostic.ts");
+  assert.match(realDiagnostic, /timeBasis: "relative_fact_check_window"/);
+  assert.match(realDiagnostic, /absoluteTimeAvailable: false/);
+  assert.match(realDiagnostic, /status: "unavailable"/);
+  assert.match(realDiagnostic, /reason: "issue_anchor_unavailable"/);
+  assert.match(realDiagnostic, /businessPriority: "unassessed"/);
+  assert.match(realDiagnostic, /reason: "enterprise_risk_taxonomy_unavailable"/);
+  assert.match(realDiagnostic, /candidateAvailability: hypotheses\.length > 0/);
+  assert.match(realDiagnostic, /: "no_supported_direction"/);
+  assert.match(realDiagnostic, /hypothesisId: topHypothesis\?\.id \?\? ""/);
+  assert.match(realDiagnostic, /补齐字段后，仍没有任何可支持的核验方向/);
+  assert.doesNotMatch(realDiagnostic, /当前首位疑因是否仍成立/);
+});
+
+test("real-case evidence tasks do not invent a business risk priority", async () => {
+  const [feishuAi, component] = await Promise.all([
+    read("app/lib/feishu-ai.ts"),
+    read("app/components/FeishuAICopilot.tsx"),
+  ]);
+  assert.match(feishuAi, /priority: "P0" \| "P1" \| "P2" \| "待企业排期"/);
+  assert.match(feishuAi, /snapshot\.source === "real_case_derived" \? "待企业排期"/);
+  assert.match(feishuAi, /原始时序切片/);
+  assert.match(feishuAi, /附件正文与关键帧/);
+  assert.match(feishuAi, /独立工程复核记录/);
+  assert.match(component, /pending-schedule/);
+});
+
+test("Feishu surfaces handle a real-case snapshot with no supported directions", async () => {
+  const [cardSource, feishuRoute, feishuAi] = await Promise.all([
+    read("app/lib/feishu-card.ts"),
+    read("app/api/feishu/route.ts"),
+    read("app/lib/feishu-ai.ts"),
+  ]);
+  const typescript = await import("typescript");
+  const compiledCard = typescript.transpileModule(cardSource, {
+    compilerOptions: {
+      target: typescript.ScriptTarget.ES2022,
+      module: typescript.ModuleKind.ESNext,
+    },
+  }).outputText;
+  const cardModuleUrl = `data:text/javascript;base64,${Buffer.from(compiledCard).toString("base64")}`;
+  const { buildIncidentReviewCard } = await import(cardModuleUrl);
+  const executableFeishuAi = feishuAi.replace(
+    /import \{\s*gateBlockerLabel,[\s\S]*?\} from "\.\/diagnostic-snapshot";/,
+    "const gateBlockerLabel = (blocker: string) => blocker;",
+  );
+  const compiledFeishuAi = typescript.transpileModule(executableFeishuAi, {
+    compilerOptions: {
+      target: typescript.ScriptTarget.ES2022,
+      module: typescript.ModuleKind.ESNext,
+    },
+  }).outputText;
+  const feishuAiModuleUrl = `data:text/javascript;base64,${Buffer.from(compiledFeishuAi).toString("base64")}`;
+  const { buildFeishuAIAnswer } = await import(feishuAiModuleUrl);
+  const incident = {
+    id: "REAL-EMPTY-001",
+    title: "真实案例证据不足",
+    risk: "低",
+    facts: [],
+  };
+  const snapshot = {
+    eventId: incident.id,
+    snapshotId: `${incident.id}:logs_only:evidence-boundary-v1`,
+    source: "real_case_derived",
+    scoringAvailable: false,
+    mode: "logs_only",
+    hypotheses: [],
+    gate: { canConfirm: false, blockers: ["raw_evidence_missing", "scoring_unavailable"] },
+    evidence: { availableSlots: 0, totalSlots: 3, completeness: 0 },
+  };
+  const executableFeishuRoute = feishuRoute
+    .replace(/import \{ NextResponse \} from "next\/server";/, "const NextResponse = {};")
+    .replace(
+      /import \{ buildIncidentReviewCard, sendFeishuInteractiveCard \} from "\.\.\/\.\.\/lib\/feishu-card";/,
+      "const buildIncidentReviewCard = () => ({}); const sendFeishuInteractiveCard = async () => ({ ok: false });",
+    )
+    .replace(
+      /import \{ resolveIncident \} from "\.\.\/\.\.\/lib\/incident-resolver";/,
+      "const resolveIncident = () => globalThis.__drivelensEmptyResolved;",
+    )
+    .replace(/import type \{ EvidenceMode \} from "\.\.\/\.\.\/lib\/diagnostic-snapshot";/, "")
+    .replace("function buildFields(body: SyncRequest)", "export function buildFields(body: SyncRequest)");
+  const compiledFeishuRoute = typescript.transpileModule(executableFeishuRoute, {
+    compilerOptions: {
+      target: typescript.ScriptTarget.ES2022,
+      module: typescript.ModuleKind.ESNext,
+    },
+  }).outputText;
+  globalThis.__drivelensEmptyResolved = { incident, snapshot, source: "real_case_derived" };
+  const feishuRouteModuleUrl = `data:text/javascript;base64,${Buffer.from(compiledFeishuRoute).toString("base64")}`;
+  const { buildFields } = await import(feishuRouteModuleUrl);
+
+  const card = buildIncidentReviewCard(incident, snapshot);
+  const serialized = JSON.stringify(card);
+  assert.ok(card);
+  assert.match(serialized, /暂无可成立核验方向，先补原始证据/);
+  assert.doesNotMatch(serialized, /Top1|P0|P1|P2/);
+  assert.equal(buildIncidentReviewCard({ ...incident, id: "OTHER" }, snapshot), null);
+
+  const answer = buildFeishuAIAnswer(incident, snapshot, "还缺哪些证据，应该分派给谁？");
+  assert.match(answer.answer, /暂无可成立核验方向，先补原始证据/);
+  assert.doesNotMatch(answer.answer, /Top1|暂列第一|P0|P1|P2/);
+  assert.equal(answer.tasks.length, 3);
+  assert.ok(answer.tasks.every((task) => task.priority === "待企业排期"));
+  assert.ok(answer.tasks.every((task) => /当前暂无可成立核验方向/.test(task.rationale)));
+
+  const resolvedFields = buildFields({ eventId: incident.id });
+  delete globalThis.__drivelensEmptyResolved;
+  assert.ok(resolvedFields);
+  assert.equal(resolvedFields.fields["候选原因Top3"], "暂无可成立核验方向，先补原始证据");
+  assert.match(resolvedFields.fields["缺失证据"], /原始时序/);
+  assert.match(resolvedFields.fields["核验建议"], /先补原始证据/);
+
+  assert.match(feishuRoute, /selected\?\.action \?\? `\$\{noDirectionMessage\}/);
+  assert.match(feishuRoute, /candidateSummary\s*\?[^:]+:\s*noDirectionMessage/s);
+  assert.match(feishuAi, /priority: snapshot\.source === "real_case_derived" \? "待企业排期"/);
+  assert.match(feishuAi, /if \(!top\)/);
+  assert.match(feishuAi, /暂无可成立核验方向，先补原始证据/);
+});

@@ -42,3 +42,7 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+
+# editor tool caches
+/.trae-html-share-packages/
+/.workbuddy/

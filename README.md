@@ -26,6 +26,7 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 - **统一诊断快照**：右侧 Top3、可信度校验、导出 JSON、多维表格与群卡片全部消费同一 snapshotId；服务端拒绝旧快照和越过门禁的“已核验”写入。
 - **研发协同**：支持把异常诊断记录写入飞书多维表格，并发送包含证据版本、候选疑因和门禁状态的群卡片；无凭证或网络失败时保留同结构本地载荷，不伪装远程成功。
 - **飞书 AI 协同智能体**：提供绑定当前诊断快照的对话式诊断、带来源引用的SOP问答，以及按证据槽位自动生成和路由补证任务；未配置企业Aily、知识库或任务表时运行本地可信适配器并明确标注边界。
+- **真实案例边界模式**：已接入10个真实案例衍生脱敏夹具，统一展示事实检查、缺失字段和证据边界；因原始MCAP、附件正文和独立金标未分发，真实案例默认禁止计分与根因确认。
 
 ## 快速启动
 
@@ -42,6 +43,7 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
     npm test
     npm run lint
     npx tsc -p tsconfig.app.json --noEmit
+    npm run assessment:check
 
 ## 推荐演示顺序
 
@@ -54,6 +56,8 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 
 完整讲解词见 [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)，飞书事件表接入步骤见 [docs/FEISHU_SETUP.md](docs/FEISHU_SETUP.md)，飞书智能伙伴、知识库与补证任务接口见 [docs/FEISHU_AI_INTEGRATION.md](docs/FEISHU_AI_INTEGRATION.md)。
 
+真实业务指标的采集与完成门槛见 [docs/BUSINESS_EVALUATION.md](docs/BUSINESS_EVALUATION.md)。
+
 ## 配置
 
 复制 .env.example 为 .env.local。所有配置均为可选，不填写也能完成本地演示。
@@ -63,9 +67,11 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 - FEISHU_BITABLE_APP_TOKEN、FEISHU_BITABLE_TABLE_ID：异常诊断多维表格。
 - FEISHU_CHAT_ID：可选；配置后创建记录成功会继续发送飞书研发核验卡。
 
-## 可信边界
+## 真实数据与评测边界
 
-- 所有车辆、时序、现场证据和历史案例均为确定性合成数据，仅用于验证产品机制。
+- 演示数据、现场补证和历史案例仍为确定性合成数据，仅用于验证产品机制。
+- `real data/extracted/external` 中的10个案例是脱敏、真实案例衍生的元数据夹具；不含原始MCAP或附件正文，不能证明生产准确率。
+- `real data/assessment/submissions` 是按公开 schema 生成的保守评测答案；10/10 在证据边界处停止，未使用私有金标计算准确率。
 - 证据分由确定性规则计算；模型只生成解释文本，不得改分、改排序或补造事实；最终根因必须由工程师确认。
 - 缺失证据不会被当成零值；模型输出不满足固定结构时自动回退到确定性结果。
 - 相似案例只用于缩小排查范围，不直接继承根因。

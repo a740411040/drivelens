@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { incidents } from "../../lib/demo-data";
-import {
-  createDiagnosticSnapshot,
-  type EvidenceMode,
-} from "../../lib/diagnostic-snapshot";
+import { resolveIncident } from "../../lib/incident-resolver";
+import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 interface DiagnoseRequest {
   eventId?: string;
@@ -21,12 +18,21 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
-  const incident = incidents.find((item) => item.id === body.eventId);
-  if (!incident) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
     ? "scene_verified"
     : "logs_only";
-  const snapshot = createDiagnosticSnapshot(incident, evidenceMode);
+  const resolved = body.eventId ? resolveIncident(body.eventId, evidenceMode) : undefined;
+  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
+  const { incident, snapshot } = resolved;
+
+  if (!snapshot.scoringAvailable) {
+    return NextResponse.json({
+      mode: "evidence-engine",
+      engine: snapshot.scoringVersion,
+      snapshot,
+      notice: "当前只有真实案例派生元数据；未调用大模型进行归因，结论保持证据不足。",
+    });
+  }
 
   const apiBase = process.env.LLM_API_BASE?.replace(/\/$/, "");
   const apiKey = process.env.LLM_API_KEY;

@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import { incidents } from "../../lib/demo-data";
 import {
   buildEvidenceTasks,
   buildFeishuAIAnswer,
   type EvidenceTask,
 } from "../../lib/feishu-ai";
-import {
-  createDiagnosticSnapshot,
-  type EvidenceMode,
-} from "../../lib/diagnostic-snapshot";
+import { resolveIncident } from "../../lib/incident-resolver";
+import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 type FeishuAIAction = "chat" | "create_tasks";
 
@@ -107,10 +104,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
-  const incident = incidents.find((item) => item.id === body.eventId);
-  if (!incident) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified" ? "scene_verified" : "logs_only";
-  const snapshot = createDiagnosticSnapshot(incident, evidenceMode);
+  const resolved = body.eventId ? resolveIncident(body.eventId, evidenceMode) : undefined;
+  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
+  const { incident, snapshot, source } = resolved;
   if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
@@ -122,8 +119,11 @@ export async function POST(request: Request) {
   if (action === "chat") {
     return NextResponse.json({
       ...buildFeishuAIAnswer(incident, snapshot, body.message ?? "分析当前异常"),
-      remote: { aily: false, knowledge: false, taskRecords: false },
-      notice: "当前运行本地可信适配器；接口已可由飞书智能伙伴技能调用，但未配置企业Aily与知识库凭证。",
+       remote: { aily: false, knowledge: false, taskRecords: false },
+       source,
+       notice: source === "real_case_derived"
+         ? "当前为真实案例派生元数据；原始时序与企业知识库未接入，回答仅作证据边界说明。"
+         : "当前运行本地可信适配器；企业Aily与知识库凭证尚未配置。",
     });
   }
 
@@ -200,4 +200,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

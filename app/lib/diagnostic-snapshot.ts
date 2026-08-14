@@ -2,7 +2,7 @@ import type { Hypothesis, Incident } from "./demo-data";
 
 export type EvidenceMode = "logs_only" | "scene_verified";
 export type EvidencePolarity = "support" | "counter";
-export type EvidenceSource = "车端日志" | "人工标注" | "状态快照" | "地图核验";
+export type EvidenceSource = "车端日志" | "人工标注" | "状态快照" | "地图核验" | "派生事实检查";
 
 export interface EvidenceEffect {
   hypothesisId: string;
@@ -65,7 +65,10 @@ export type EvidenceGateBlocker =
   | "low_top1_score"
   | "small_margin"
   | "counter_unassessed"
-  | "falsification_pending";
+  | "falsification_pending"
+  | "raw_evidence_missing"
+  | "scoring_unavailable"
+  | "independent_review_missing";
 
 export interface EvidenceGate {
   state: "blocked" | "reviewable";
@@ -80,7 +83,23 @@ export interface EvidenceGate {
 export interface DiagnosticSnapshot {
   schemaVersion: "drivelens.snapshot.v2";
   snapshotId: string;
-  scoringVersion: "evidence-points-v1";
+  scoringVersion: "evidence-points-v1" | "evidence-boundary-v1";
+  source: "synthetic_demo" | "real_case_derived";
+  scoringAvailable: boolean;
+  epistemicState: "candidate_ranking" | "insufficient_evidence";
+  terminalClass: "pending_human_review" | "insufficient_evidence";
+  capabilities: {
+    telemetry: boolean;
+    robustness: boolean;
+    similarity: boolean;
+    supplementalEvidence: boolean;
+  };
+  dataQuality: {
+    rawEvidenceEmbedded: boolean;
+    independentGoldReviewed: boolean;
+    alignmentConfidence: string;
+    functionDomainDecodeSufficient: boolean;
+  };
   eventId: string;
   mode: EvidenceMode;
   evidence: {
@@ -348,6 +367,22 @@ export function createDiagnosticSnapshot(
     schemaVersion: "drivelens.snapshot.v2",
     snapshotId: `${incident.id}:${mode}:evidence-points-v1`,
     scoringVersion: "evidence-points-v1",
+    source: "synthetic_demo",
+    scoringAvailable: true,
+    epistemicState: "candidate_ranking",
+    terminalClass: "pending_human_review",
+    capabilities: {
+      telemetry: true,
+      robustness: true,
+      similarity: true,
+      supplementalEvidence: true,
+    },
+    dataQuality: {
+      rawEvidenceEmbedded: true,
+      independentGoldReviewed: false,
+      alignmentConfidence: "synthetic_exact",
+      functionDomainDecodeSufficient: true,
+    },
     eventId: incident.id,
     mode,
     evidence: {
@@ -372,6 +407,9 @@ export function gateBlockerLabel(blocker: EvidenceGateBlocker): string {
     small_margin: "首位与次位差距不足",
     counter_unassessed: "尚未评估反证",
     falsification_pending: "最小证伪实验尚未完成",
+    raw_evidence_missing: "原始时序或附件正文未进入当前证据包",
+    scoring_unavailable: "当前只有派生观察，不能计算可信疑因分数",
+    independent_review_missing: "尚无独立工程师金标或复核结论",
   };
   return labels[blocker];
 }

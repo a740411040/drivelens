@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
-import { incidents } from "../../../lib/demo-data";
-import {
-  createDiagnosticSnapshot,
-  type EvidenceMode,
-} from "../../../lib/diagnostic-snapshot";
+import { resolveIncident } from "../../../lib/incident-resolver";
+import type { EvidenceMode } from "../../../lib/diagnostic-snapshot";
 
 const reviewActions = ["accept_top1", "request_evidence", "escalate"] as const;
 type ReviewAction = (typeof reviewActions)[number];
@@ -139,9 +136,9 @@ export async function POST(request: Request) {
   const parsed = parseReview(rawBody as ReviewRequest);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const incident = incidents.find((item) => item.id === parsed.review.eventId);
-  if (!incident) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
-  const snapshot = createDiagnosticSnapshot(incident, parsed.review.evidenceMode);
+  const resolved = resolveIncident(parsed.review.eventId, parsed.review.evidenceMode);
+  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
+  const { snapshot } = resolved;
   if (parsed.review.snapshotId && parsed.review.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },

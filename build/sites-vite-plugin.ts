@@ -29,7 +29,14 @@ export function sites(): Plugin {
       const hostingConfig = resolve(root, ".openai", "hosting.json");
       const drizzleSource = resolve(root, "drizzle");
 
-      await rm(outputDirectory, { recursive: true, force: true });
+      // Best-effort cleanup: some sandboxes intercept deletions (e.g. routing
+      // rm through a trash shim) and may abort them. A failed cleanup must not
+      // fail the whole build; mkdir/cp below still converge the output.
+      try {
+        await rm(outputDirectory, { recursive: true, force: true });
+      } catch (error) {
+        console.warn("[sites] cleanup of dist/.openai skipped:", (error as Error).message ?? error);
+      }
       await mkdir(outputDirectory, { recursive: true });
 
       if (await exists(hostingConfig)) {

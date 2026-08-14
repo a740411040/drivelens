@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
-import { incidents } from "../../lib/demo-data";
 import { buildIncidentReviewCard, sendFeishuInteractiveCard } from "../../lib/feishu-card";
-import {
-  createDiagnosticSnapshot,
-  type EvidenceMode,
-} from "../../lib/diagnostic-snapshot";
+import { resolveIncident } from "../../lib/incident-resolver";
+import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 interface SyncRequest {
   eventId?: string;
@@ -33,42 +30,53 @@ interface CreateRecordResponse {
 }
 
 function buildFields(body: SyncRequest) {
-  const incident = incidents.find((item) => item.id === body.eventId);
-  if (!incident) return null;
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
     ? "scene_verified"
     : "logs_only";
-  const snapshot = createDiagnosticSnapshot(incident, evidenceMode);
+  const resolved = body.eventId ? resolveIncident(body.eventId, evidenceMode) : undefined;
+  if (!resolved) return null;
+  const { incident, snapshot, source } = resolved;
   const selected = snapshot.hypotheses.find((item) => item.id === body.selectedHypothesisId)
     ?? snapshot.hypotheses[0];
-  const top3 = snapshot.hypotheses
-    .map((item, index) => `${index + 1}. ${item.title}（匹配度 ${item.score}）`)
+  const noDirectionMessage = "暂无可成立核验方向，先补原始证据";
+  const candidateSummary = snapshot.hypotheses
+    .map((item, index) => snapshot.scoringAvailable
+      ? `${index + 1}. ${item.title}（匹配度 ${item.score}）`
+      : `${item.title}（不排序核验方向）`)
     .join("\n");
-  const missing = Array.from(new Set(snapshot.hypotheses.flatMap((item) => item.missing))).join("；");
+  const missing = Array.from(new Set(snapshot.hypotheses.flatMap((item) => item.missing))).join("；")
+    || (source === "real_case_derived" ? "原始时序、附件正文与功能域关键字段" : "暂无");
+  const directionSummary = source === "real_case_derived"
+    ? candidateSummary
+      ? `不排序核验方向：\n${candidateSummary}`
+      : noDirectionMessage
+    : candidateSummary || noDirectionMessage;
 
   const fields = {
     "事件ID": incident.id,
-    "发生时间": `2026-07-26 ${incident.happenedAt}+08:00`,
-    "车辆ID": incident.vehicle,
-    "场景": incident.location,
+    "发生时间": source === "real_case_derived" ? "已去标识" : `2026-07-26 ${incident.happenedAt}+08:00`,
+    "车辆ID": source === "real_case_derived" ? "已去标识" : incident.vehicle,
+    "场景": source === "real_case_derived" ? "真实 RCA 派生案例" : incident.location,
     "异常类型": incident.title,
-    "风险等级": incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2",
-    "触发规则": `${incident.rule}\n${incident.trigger}`,
+    "风险等级": incident.riskAssessment === "unavailable" ? "待企业评估" : incident.risk === "高" ? "P0" : incident.risk === "中" ? "P1" : "P2",
+    "触发规则": source === "real_case_derived" ? `派生事实检查摘要\n${incident.trigger}` : `${incident.rule}\n${incident.trigger}`,
     "证据摘要": [
       `快照：${snapshot.snapshotId}`,
-      `覆盖：${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）`,
+      source === "real_case_derived"
+        ? `派生检查：${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots} 项状态可读；原始证据未接入`
+        : `覆盖：${snapshot.evidence.availableSlots}/${snapshot.evidence.totalSlots}（${snapshot.evidence.completeness}%）`,
       `门禁：${snapshot.gate.canConfirm ? "可进入人工确认" : "禁止确认根因"}`,
-      ...incident.facts.map((fact) => `${fact.label}: ${fact.value}；${fact.detail}`),
+      ...(incident.facts ?? []).map((fact) => `${fact.label}: ${fact.value}；${fact.detail}`),
     ].join("\n"),
-    "候选原因Top3": top3,
+    "候选原因Top3": directionSummary,
     "缺失证据": missing,
-    "核验建议": selected.action,
+    "核验建议": selected?.action ?? `${noDirectionMessage}；补齐后重新生成核验方向。`,
     "回放地址": body.replayUrl ?? "http://localhost:3001/",
     "核验状态": body.review?.status ?? "待核验",
     "人工根因": body.review?.rootCause ?? "",
     "修复版本": "",
   };
-  return { incident, snapshot, fields };
+  return { incident, snapshot, fields, source };
 }
 
 export async function POST(request: Request) {
@@ -87,14 +95,15 @@ export async function POST(request: Request) {
   if (!resolved || !body.eventId) {
     return NextResponse.json({ error: "unknown_event" }, { status: 404 });
   }
-  const { incident, snapshot, fields } = resolved;
+  const { incident, snapshot, fields, source } = resolved;
   if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
       { status: 409 },
     );
   }
-  if (body.review?.status === "已核验" && !snapshot.gate.canConfirm) {
+  const attemptsAttribution = Boolean(body.review?.rootCause?.trim()) || /已核验|已确认|根因确认/.test(body.review?.status ?? "");
+  if (attemptsAttribution && !snapshot.gate.canConfirm) {
     return NextResponse.json(
       { error: "evidence_gate_blocked", blockers: snapshot.gate.blockers },
       { status: 422 },
@@ -127,6 +136,7 @@ export async function POST(request: Request) {
       {
         mode: "local-outbox",
         remote: { bitable: false, card: false },
+        source,
         fields,
         cardPreview: localCardPreview,
         messageRequest: {

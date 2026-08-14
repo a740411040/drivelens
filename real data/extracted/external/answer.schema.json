@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rca-assessment/answer/v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "case_id",
+    "issue_focus",
+    "data_assessment",
+    "alignment",
+    "measurements",
+    "evaluator_results",
+    "hypotheses",
+    "decision",
+    "report"
+  ],
+  "properties": {
+    "schema_version": {"const": "rca-assessment/answer/v1"},
+    "case_id": {"type": "string", "pattern": "^RCA-EXT-[0-9]{3}$"},
+    "issue_focus": {
+      "type": "object",
+      "required": ["domain", "phenomena", "required_capabilities", "required_segments"],
+      "properties": {
+        "domain": {"type": "string"},
+        "phenomena": {"type": "array", "items": {"type": "string"}},
+        "target_roles": {"type": "array", "items": {"type": "string"}},
+        "required_capabilities": {"type": "array", "items": {"type": "string"}},
+        "required_segments": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "data_assessment": {
+      "type": "object",
+      "required": ["status", "relevant_topics", "missing_requirements", "evidence_boundary"],
+      "properties": {
+        "status": {"type": "string"},
+        "relevant_topics": {"type": "array", "items": {"type": "string"}},
+        "missing_requirements": {"type": "array", "items": {"type": "string"}},
+        "evidence_boundary": {"type": "string"}
+      }
+    },
+    "alignment": {
+      "type": "object",
+      "required": ["anchor", "windows", "entity_bindings"],
+      "properties": {
+        "anchor": {"type": "object"},
+        "windows": {"type": "array", "items": {"type": "object"}},
+        "entity_bindings": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "measurements": {"type": "array", "items": {"type": "object"}},
+    "evaluator_results": {"type": "array", "items": {"type": "object"}},
+    "hypotheses": {"type": "array", "items": {"type": "object"}},
+    "decision": {
+      "type": "object",
+      "required": ["epistemic_state", "publication_terminal_class", "conclusion", "confidence", "next_action"],
+      "properties": {
+        "epistemic_state": {"type": "string"},
+        "publication_terminal_class": {"type": "string"},
+        "responsibility_domain": {"type": "string"},
+        "conclusion": {"type": "string"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "stop_reason": {"type": ["string", "null"]},
+        "next_action": {"type": "string"}
+      }
+    },
+    "report": {
+      "type": "object",
+      "required": ["headline", "summary", "evidence", "boundary", "next_action"],
+      "properties": {
+        "headline": {"type": "string"},
+        "summary": {"type": "string"},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "boundary": {"type": "array", "items": {"type": "string"}},
+        "next_action": {"type": "string"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

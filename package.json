@@ -9,8 +9,10 @@
                     "dev":  "vinext dev",
                     "build":  "vinext build",
                     "start":  "vinext start",
-                    "test":  "npm run build \u0026\u0026 node --test --test-isolation=none tests/rendered-html.test.mjs tests/diagnostic-toolbox.test.mjs",
-                    "lint":  "eslint . --ignore-pattern dist --ignore-pattern .next",
+                    "test":  "npm run build \u0026\u0026 node --test tests/rendered-html.test.mjs tests/diagnostic-toolbox.test.mjs",
+    "lint":  "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "assessment:generate": "node scripts/real-assessment.mjs",
+    "assessment:check": "node scripts/real-assessment.mjs --check",
                     "db:generate":  "drizzle-kit generate"
                 },
     "dependencies":  {

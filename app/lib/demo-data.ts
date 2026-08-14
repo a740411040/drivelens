@@ -49,6 +49,8 @@ export interface Incident {
   vehicle: string;
   version: string;
   risk: RiskLevel;
+  riskAssessment?: "available" | "unavailable";
+  dataSource?: "synthetic_demo" | "real_case_derived";
   status: "待核验" | "补证中" | "已核验";
   scene: string;
   trigger: string;
@@ -349,12 +351,12 @@ export const signalDefinitions: Array<{
   unit: string;
   color: string;
 }> = [
-  { key: "speed", label: "速度", unit: "m/s", color: "#2f6bff" },
-  { key: "acceleration", label: "加速度", unit: "m/s²", color: "#ff6b4a" },
-  { key: "distance", label: "目标距离", unit: "m", color: "#16a085" },
-  { key: "trackingConfidence", label: "跟踪置信度", unit: "", color: "#8b5cf6" },
-  { key: "lateralError", label: "横向偏差", unit: "m", color: "#d97706" },
-  { key: "riskScore", label: "风险评分", unit: "", color: "#e23b5b" },
+  { key: "speed", label: "速度", unit: "m/s", color: "#00b4ff" },
+  { key: "acceleration", label: "加速度", unit: "m/s²", color: "#ff7849" },
+  { key: "distance", label: "目标距离", unit: "m", color: "#00e5cc" },
+  { key: "trackingConfidence", label: "跟踪置信度", unit: "", color: "#a78bfa" },
+  { key: "lateralError", label: "横向偏差", unit: "m", color: "#ffa502" },
+  { key: "riskScore", label: "风险评分", unit: "", color: "#ff4757" },
 ];
 
 export interface RuleDetection {
@@ -367,6 +369,14 @@ export interface RuleDetection {
 }
 
 export function detectRules(points: TelemetryPoint[]): RuleDetection[] {
+  if (points.length === 0) {
+    return [
+      { id: "hard_brake", title: "急减速", hit: false, value: 0, threshold: -1.5, unit: "m/s²" },
+      { id: "long_stop", title: "长时静止", hit: false, value: 0, threshold: 12, unit: "s" },
+      { id: "frequent_replan", title: "频繁重规划", hit: false, value: 0, threshold: 5, unit: "次" },
+      { id: "large_detour", title: "绕行偏差", hit: false, value: 0, threshold: 1.2, unit: "m" },
+    ];
+  }
   const minAcceleration = Math.min(...points.map((point) => point.acceleration));
   const maxReplans = Math.max(...points.map((point) => point.replanCount));
   const maxLateralError = Math.max(...points.map((point) => point.lateralError));

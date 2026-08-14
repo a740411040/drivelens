@@ -7,17 +7,13 @@ import {
   createRobustnessCertificate,
   retrieveSimilarCases,
   buildFaultFingerprint,
+  type RobustnessCertificate,
 } from "../lib/diagnostic-intelligence";
+import MonteCarloWaterfall from "./MonteCarloWaterfall";
 
 type DepthTab = "robustness" | "fingerprint";
 
 const percentage = (value: number) => `${Math.round(value * 100)}%`;
-
-function stabilityTone(value: number): string {
-  if (value >= 0.9) return "stable";
-  if (value >= 0.75) return "watch";
-  return "sensitive";
-}
 
 export default function DiagnosticDepthPanel({
   incident,
@@ -27,36 +23,35 @@ export default function DiagnosticDepthPanel({
   snapshot: DiagnosticSnapshot;
 }) {
   const [tab, setTab] = useState<DepthTab>("robustness");
-  const [rechecking, setRechecking] = useState(false);
-  const [rerunNonce, setRerunNonce] = useState(0);
+  const [certificate, setCertificate] = useState<RobustnessCertificate | null>(null);
   const diagnosticIncident = useMemo(
     () => ({ ...incident, hypotheses: snapshot.hypotheses }),
     [incident, snapshot],
   );
-  const certificate = createRobustnessCertificate(diagnosticIncident, { trials: 100 });
+  const fallbackCertificate = useMemo(
+    () => snapshot.capabilities.robustness
+      ? createRobustnessCertificate(diagnosticIncident, { trials: 100 })
+      : null,
+    [diagnosticIncident, snapshot.capabilities.robustness],
+  );
   const fingerprint = useMemo(
-    () => buildFaultFingerprint(diagnosticIncident.kind, diagnosticIncident.telemetry),
-    [diagnosticIncident],
+    () => snapshot.capabilities.similarity
+      ? buildFaultFingerprint(diagnosticIncident.kind, diagnosticIncident.telemetry)
+      : null,
+    [diagnosticIncident, snapshot.capabilities.similarity],
   );
   const matches = useMemo(
-    () => retrieveSimilarCases(diagnosticIncident, 3),
-    [diagnosticIncident],
+    () => snapshot.capabilities.similarity ? retrieveSimilarCases(diagnosticIncident, 3) : [],
+    [diagnosticIncident, snapshot.capabilities.similarity],
   );
 
-  const rerun = () => {
-    setRechecking(true);
-    window.setTimeout(() => {
-      setRerunNonce((current) => current + 1);
-      setRechecking(false);
-    }, 420);
-  };
-
-  const topDependency = certificate.criticalDependencies[0];
-  const sensitiveThreshold = certificate.thresholdSensitivity.find((item) => item.sensitive);
+  const activeCertificate = certificate ?? fallbackCertificate;
+  const topDependency = activeCertificate?.criticalDependencies[0];
+  const sensitiveThreshold = activeCertificate?.thresholdSensitivity.find((item) => item.sensitive);
   const topMatch = matches[0];
 
   return (
-    <section className="depth-card" aria-label="诊断稳健性与历史案例复用" data-rerun-count={rerunNonce}>
+    <section className="depth-card" aria-label="诊断稳健性与历史案例复用">
       <header className="depth-card-head">
         <div>
           <span className="eyebrow">可信度校验 · 当前快照 {snapshot.mode === "scene_verified" ? "V1" : "L0"}</span>
@@ -68,27 +63,31 @@ export default function DiagnosticDepthPanel({
         </div>
       </header>
 
-      {tab === "robustness" ? (
+      {!snapshot.capabilities.telemetry ? (
         <div className="robustness-view">
-          <div className="certificate-summary">
-            <div className="certificate-seal"><strong>{certificate.trials}</strong><span>次确定性扰动重算</span><small>固定种子可复现</small></div>
-            <div className="stability-metrics">
-              {[
-                ["规则检出稳定", certificate.detectionStabilityRate],
-                ["Top1 排名稳定", certificate.top1StabilityRate],
-                ["Top3 排序一致", certificate.top3StabilityRate],
-              ].map(([label, raw]) => {
-                const value = raw as number;
-                return <article key={label as string} className={stabilityTone(value)}><span>{label as string}</span><strong>{percentage(value)}</strong><i><b style={{ width: percentage(value) }} /></i></article>;
-              })}
-            </div>
-            <button className="rerun-certificate" type="button" onClick={rerun} disabled={rechecking}>
-              {rechecking ? "正在复现 100 次扰动…" : "复现同一组 100 次扰动"}
-            </button>
+          <div className="robustness-explain">
+            <article className="is-warning">
+              <span>当前不可计算</span>
+              <strong>数据包未包含原始时序切片</strong>
+              <small>抗扰动、故障指纹和相似度需要真实采样点；系统不会对空数组生成稳定率。</small>
+            </article>
+            <article>
+              <span>恢复条件</span>
+              <strong>接入可对时的信号窗口与字段字典</strong>
+              <small>至少包含事件锚点、采样频率、单位、目标别名连续性与缺失语义。</small>
+            </article>
           </div>
+          <p className="assurance-boundary">当前案例只能验证证据边界和协同流程，不能评价道路效果。</p>
+        </div>
+      ) : tab === "robustness" ? (
+        <div className="robustness-view">
+          <MonteCarloWaterfall
+            incident={diagnosticIncident}
+            onComplete={setCertificate}
+          />
           <div className="robustness-explain">
             <article>
-              <span>扰动条件</span>
+              <span>扰动条件 · 确定性扰动重算</span>
               <strong>随机丢点 5% · 数值噪声 5% · 时间抖动 ±0.1s · 阈值抖动 10%</strong>
               <small>每一次都重新检测事件并重排疑因，不是写死的展示数字。</small>
             </article>
@@ -104,9 +103,9 @@ export default function DiagnosticDepthPanel({
       ) : (
         <div className="fingerprint-view">
           <div className="fingerprint-sequence">
-            <div className="fingerprint-title"><span>当前故障指纹</span><strong>{fingerprint.sequence.length} 个语义变化 · {fingerprint.dataPoints} 个时序点</strong></div>
+            <div className="fingerprint-title"><span>当前故障指纹</span><strong>{fingerprint?.sequence.length ?? 0} 个语义变化 · {fingerprint?.dataPoints ?? 0} 个时序点</strong></div>
             <div className="sequence-rail">
-              {fingerprint.sequence.slice(0, 8).map((event, index) => (
+              {fingerprint?.sequence.slice(0, 8).map((event, index) => (
                 <article key={`${event.type}-${event.t}-${index}`}><time>t={event.t > 0 ? "+" : ""}{event.t}s</time><i /><strong>{event.label}</strong></article>
               ))}
             </div>

@@ -1,0 +1,305 @@
+{
+  "schema_version": "rca-assessment/answer/v1",
+  "case_id": "RCA-EXT-004",
+  "issue_focus": {
+    "domain": "ACC",
+    "phenomena": [
+      "ACC，跟停前面静止车辆，无刹车迹象"
+    ],
+    "target_roles": [
+      "front_target.range",
+      "front_target.speed",
+      "front_front_target.range",
+      "front_front_target.speed",
+      "cipv.selected_alias"
+    ],
+    "required_capabilities": [
+      "ego.speed",
+      "front_target.range",
+      "front_target.speed",
+      "front_front_target.range",
+      "front_front_target.speed",
+      "cipv.selected_alias",
+      "controller.request_decel",
+      "driver_override",
+      "capture_completeness",
+      "frame_id"
+    ],
+    "required_segments": [
+      "intake_description",
+      "decoded_case_metadata",
+      "raw_signal_slice",
+      "attachment_evidence"
+    ]
+  },
+  "data_assessment": {
+    "status": "insufficient_evidence",
+    "relevant_topics": [
+      "debug_can",
+      "object_perception",
+      "hmi_objects",
+      "vision_objects",
+      "vision_warning",
+      "object_collection",
+      "vehicle_signal_highfreq",
+      "vehicle_signal_lowfreq",
+      "planning_environment",
+      "lane_2d",
+      "lane_bev",
+      "lane_sr",
+      "lane_hmi",
+      "road_marking",
+      "localization_gnss"
+    ],
+    "missing_requirements": [
+      "raw MCAP signal slice",
+      "attachment bodies or independently reviewed frame annotations",
+      "private gold terminal label and causal graph",
+      "adjudicated issue anchor",
+      "higher-confidence time and entity alignment"
+    ],
+    "evidence_boundary": "The fixture contains de-identified case metadata and derived factual-check observations. It contains no raw MCAP slice, attachment body, private gold label, or independently reviewed causal conclusion."
+  },
+  "alignment": {
+    "anchor": {
+      "status": "unavailable",
+      "alignment": "frame_id_interpolated"
+    },
+    "windows": [
+      {
+        "kind": "factual_check_window",
+        "check": "object_kinematics_consistency",
+        "start_s": -3,
+        "end_s": 1
+      },
+      {
+        "kind": "factual_check_window",
+        "check": "cipv_target_selection",
+        "start_s": -4,
+        "end_s": 1
+      },
+      {
+        "kind": "factual_check_window",
+        "check": "ego_longitudinal_oscillation",
+        "start_s": -5,
+        "end_s": 2
+      },
+      {
+        "kind": "factual_check_window",
+        "check": "object_track_quality",
+        "start_s": -3,
+        "end_s": 1
+      },
+      {
+        "kind": "provided_focus_window",
+        "start_s": 23.901,
+        "end_s": 27.901
+      }
+    ],
+    "entity_bindings": [
+      {
+        "status": "not_adjudicated",
+        "available_alias_signals": [
+          "cipv.selected_alias"
+        ]
+      }
+    ]
+  },
+  "measurements": [
+    {
+      "name": "object_kinematics_consistency",
+      "observation": "observed",
+      "window_s": [
+        -3,
+        1
+      ],
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "cipv_target_selection",
+      "observation": "observed",
+      "window_s": [
+        -4,
+        1
+      ],
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "ego_longitudinal_oscillation",
+      "observation": "observed",
+      "window_s": [
+        -5,
+        2
+      ],
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "acc_decel_heavy",
+      "observation": "observed",
+      "window_s": null,
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "acc_jerk",
+      "observation": "observed",
+      "window_s": null,
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "acc_ooi_target_switch_cut_in",
+      "observation": "observed",
+      "window_s": null,
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "object_track_quality",
+      "observation": "not_observed",
+      "window_s": [
+        -3,
+        1
+      ],
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    },
+    {
+      "name": "acc_abnormal_exit_spec",
+      "observation": "not_observed",
+      "window_s": null,
+      "numeric_value_available": false,
+      "source": "factual_check_observations"
+    }
+  ],
+  "evaluator_results": [
+    {
+      "evaluator": "object_kinematics_consistency",
+      "pattern": "perception_object_kinematics_anomaly",
+      "technical_domain": "PERCEPTION_OBJECT",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "cipv_target_selection",
+      "pattern": "cipv_selection_anomaly",
+      "technical_domain": "PERCEPTION_OBJECT",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "ego_longitudinal_oscillation",
+      "pattern": "ego_longitudinal_oscillation",
+      "technical_domain": "CONTROL_LONGITUDINAL",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "acc_decel_heavy",
+      "pattern": "actual_longitudinal_deceleration_heavy",
+      "technical_domain": "ACC",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "acc_jerk",
+      "pattern": "acc_request_or_actual_acceleration_jump",
+      "technical_domain": "ACC",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "acc_ooi_target_switch_cut_in",
+      "pattern": "acc_ooi_target_switch_cut_in_moderate_decel",
+      "technical_domain": "ACC",
+      "observation": "observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "object_track_quality",
+      "pattern": null,
+      "technical_domain": "PERCEPTION_OBJECT",
+      "observation": "not_observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    },
+    {
+      "evaluator": "acc_abnormal_exit_spec",
+      "pattern": null,
+      "technical_domain": "ACC",
+      "observation": "not_observed",
+      "evidence_class": "deidentified_derived_observation",
+      "causal_conclusion": false
+    }
+  ],
+  "hypotheses": [
+    {
+      "technical_domain": "PERCEPTION_OBJECT",
+      "status": "candidate_only",
+      "causal_attribution": false,
+      "related_observations": [
+        "object_kinematics_consistency",
+        "cipv_target_selection",
+        "object_track_quality"
+      ]
+    },
+    {
+      "technical_domain": "CONTROL_LONGITUDINAL",
+      "status": "candidate_only",
+      "causal_attribution": false,
+      "related_observations": [
+        "ego_longitudinal_oscillation"
+      ]
+    },
+    {
+      "technical_domain": "ACC",
+      "status": "candidate_only",
+      "causal_attribution": false,
+      "related_observations": [
+        "acc_decel_heavy",
+        "acc_jerk",
+        "acc_ooi_target_switch_cut_in",
+        "acc_abnormal_exit_spec"
+      ]
+    }
+  ],
+  "decision": {
+    "epistemic_state": "insufficient_evidence",
+    "publication_terminal_class": "insufficient_evidence",
+    "conclusion": "No causal attribution is admissible from the distributed fixture alone.",
+    "confidence": 1,
+    "stop_reason": "Raw evidence and independent adjudication are not distributed.",
+    "next_action": "Obtain the raw aligned signal slice and attachment evidence, then have an independent engineer adjudicate the terminal class and causal direction."
+  },
+  "report": {
+    "headline": "RCA-EXT-004: evidence boundary reached",
+    "summary": "The reported phenomenon is preserved as intake context, and 8 derived factual checks are available. These observations do not establish a causal root cause.",
+    "evidence": [
+      "object_kinematics_consistency:observed",
+      "cipv_target_selection:observed",
+      "ego_longitudinal_oscillation:observed",
+      "acc_decel_heavy:observed",
+      "acc_jerk:observed",
+      "acc_ooi_target_switch_cut_in:observed",
+      "object_track_quality:not_observed",
+      "acc_abnormal_exit_spec:not_observed"
+    ],
+    "boundary": [
+      "raw MCAP signal slice",
+      "attachment bodies or independently reviewed frame annotations",
+      "private gold terminal label and causal graph",
+      "adjudicated issue anchor",
+      "higher-confidence time and entity alignment"
+    ],
+    "next_action": "Obtain the raw aligned signal slice and attachment evidence, then have an independent engineer adjudicate the terminal class and causal direction."
+  }
+}
