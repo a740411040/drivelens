@@ -8,6 +8,12 @@ import type {
   FeishuAIAnswer,
   KnowledgeCitation,
 } from "../lib/feishu-ai";
+import {
+  FEISHU_AI_TASK_OUTBOX_KEY,
+  readOutbox,
+  removeOutboxEntry,
+  type FeishuAiTaskOutboxEntry,
+} from "../lib/outbox";
 
 interface FeishuAICopilotProps {
   open: boolean;
@@ -58,6 +64,11 @@ export default function FeishuAICopilot({
   const [loading, setLoading] = useState(false);
   const [syncingTasks, setSyncingTasks] = useState(false);
   const [taskNotice, setTaskNotice] = useState<string | null>(null);
+  // 本地补证任务队列：展示与重试（见 lib/outbox.ts）。
+  // 惰性初始化读取 localStorage，避免在 effect 中同步 setState。
+  const [taskOutbox, setTaskOutbox] = useState<FeishuAiTaskOutboxEntry[]>(
+    () => readOutbox<FeishuAiTaskOutboxEntry>(FEISHU_AI_TASK_OUTBOX_KEY),
+  );
 
   const starter = useMemo(
     () => `已绑定 ${incident.id} · ${snapshot.mode === "scene_verified" ? "V1现场补证" : "L0仅日志"} · ${snapshot.snapshotId}`,
@@ -121,35 +132,53 @@ export default function FeishuAICopilot({
     }
   };
 
-  const syncTasks = async () => {
-    if (!answer?.tasks.length || syncingTasks) return;
+  const syncTasks = async (entry?: FeishuAiTaskOutboxEntry) => {
+    if (syncingTasks) return;
+    const payload = entry
+      ? {
+          action: "create_tasks" as const,
+          eventId: entry.eventId,
+          evidenceMode: entry.evidenceMode,
+          snapshotId: entry.snapshotId,
+          replayUrl: window.location.href,
+        }
+      : {
+          action: "create_tasks" as const,
+          eventId: incident.id,
+          evidenceMode: snapshot.mode,
+          snapshotId: snapshot.snapshotId,
+          replayUrl: window.location.href,
+        };
     setSyncingTasks(true);
     setTaskNotice(null);
     try {
       const response = await fetch("/api/feishu-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create_tasks",
-          eventId: incident.id,
-          evidenceMode: snapshot.mode,
-          snapshotId: snapshot.snapshotId,
-          replayUrl: window.location.href,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!response.ok && response.status !== 202) throw new Error(`task_sync_${response.status}`);
-      const payload = (await response.json()) as TaskSyncResponse;
-      if (payload.mode === "local-task-outbox") {
-        const key = "drivelens.feishu-ai-task-outbox.v1";
-        const queued = {
-          eventId: incident.id,
-          snapshotId: snapshot.snapshotId,
-          tasks: payload.tasks,
+      const result = (await response.json()) as TaskSyncResponse;
+      if (result.mode === "local-task-outbox") {
+        const queued: FeishuAiTaskOutboxEntry = {
+          eventId: payload.eventId,
+          snapshotId: payload.snapshotId,
+          evidenceMode: payload.evidenceMode,
+          tasks: result.tasks,
           queuedAt: new Date().toISOString(),
         };
-        window.localStorage.setItem(key, JSON.stringify(queued));
+        const next = [
+          ...readOutbox<FeishuAiTaskOutboxEntry>(FEISHU_AI_TASK_OUTBOX_KEY)
+            .filter((item) => item.eventId !== queued.eventId),
+          queued,
+        ];
+        setTaskOutbox(next);
+        window.localStorage.setItem(FEISHU_AI_TASK_OUTBOX_KEY, JSON.stringify(next));
+      } else if (entry) {
+        // 重试成功：移除本地条目。
+        setTaskOutbox(removeOutboxEntry(FEISHU_AI_TASK_OUTBOX_KEY, entry.eventId));
       }
-      setTaskNotice(payload.notice ?? (payload.recordIds?.length ? `已创建${payload.recordIds.length}条飞书任务` : "任务已保存"));
+      setTaskNotice(result.notice ?? (result.recordIds?.length ? `已创建${result.recordIds.length}条飞书任务` : "任务已保存"));
     } catch {
       setTaskNotice("任务同步失败；当前诊断快照未受影响。 ");
     } finally {
@@ -249,8 +278,25 @@ export default function FeishuAICopilot({
                   ))}
                 </div>
               ) : <p className="ai-panel-placeholder">询问“还缺哪些证据”后，系统会把缺失槽位转换为可验收任务。</p>}
-              <button className="primary-button full" type="button" onClick={syncTasks} disabled={!answer?.tasks.length || syncingTasks}>{syncingTasks ? "正在写入任务表…" : "同步补证任务到飞书"}</button>
+              <button className="primary-button full" type="button" onClick={() => void syncTasks()} disabled={!answer?.tasks.length || syncingTasks}>{syncingTasks ? "正在写入任务表…" : "同步补证任务到飞书"}</button>
               {taskNotice && <small className="task-sync-notice">{taskNotice}</small>}
+              {taskOutbox.length > 0 && (
+                <div className="task-outbox" aria-label="本地待同步补证任务">
+                  <div className="ai-panel-title"><span>本地待同步任务（可重试）</span><b>{taskOutbox.length}</b></div>
+                  {taskOutbox.map((entry) => (
+                    <article key={entry.eventId} className="task-outbox-entry">
+                      <div className="task-outbox-meta">
+                        <strong>{entry.eventId}</strong>
+                        <small>排队于 {new Date(entry.queuedAt).toLocaleString("zh-CN")} · {entry.tasks.length} 条任务</small>
+                      </div>
+                      <div className="task-outbox-actions">
+                        <button type="button" className="secondary-button compact" onClick={() => void syncTasks(entry)} disabled={syncingTasks}>重试</button>
+                        <button type="button" className="ghost-button compact" onClick={() => setTaskOutbox(removeOutboxEntry(FEISHU_AI_TASK_OUTBOX_KEY, entry.eventId))}>丢弃</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="ai-source-panel">

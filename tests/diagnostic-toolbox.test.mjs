@@ -1,15 +1,36 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL("../" + path, import.meta.url), "utf8");
+
+/**
+ * 组件拆分后，面向用户的文案分散在 app/components 与 app/styles 下。
+ * 汇总读取全部 TS/TSX/CSS 源码，让“表面文案”类测试对文件移动保持鲁棒。
+ */
+async function readAppSources() {
+  const parts = [];
+  const walk = async (dir) => {
+    const entries = await readdir(new URL(`../${dir}`, import.meta.url), { withFileTypes: true });
+    for (const entry of entries) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        await walk(rel);
+      } else if (/\.(ts|tsx|css)$/.test(entry.name)) {
+        parts.push(await read(rel));
+      }
+    }
+  };
+  await walk("app");
+  return parts.join("\n");
+}
 
 test("submission surface is aligned to the Youjia diagnostic challenge", async () => {
   const [readme, page, layout, app] = await Promise.all([
     read("README.md"),
     read("app/page.tsx"),
     read("app/layout.tsx"),
-    read("app/DriveLensApp.tsx"),
+    readAppSources(),
   ]);
   const surface = [readme, page, layout, app].join("\n");
   assert.match(readme, /佑驾创新/);
@@ -20,7 +41,10 @@ test("submission surface is aligned to the Youjia diagnostic challenge", async (
 });
 
 test("evidence points transparently reproduce the ranking reversal", async () => {
-  const snapshot = await read("app/lib/diagnostic-snapshot.ts");
+  const [snapshot, scoring] = await Promise.all([
+    read("app/lib/diagnostic-snapshot.ts"),
+    read("app/lib/evidence-scoring.ts"),
+  ]);
   assert.match(snapshot, /"tracking-instability": 40/);
   assert.match(snapshot, /"reasonable-yield": 35/);
   assert.match(snapshot, /effect\("tracking-instability", "support", 18/);
@@ -29,7 +53,8 @@ test("evidence points transparently reproduce the ranking reversal", async () =>
   assert.match(snapshot, /effect\("tracking-instability", "support", 6/);
   assert.match(snapshot, /effect\("reasonable-yield", "counter", 24/);
   assert.match(snapshot, /effect\("reasonable-yield", "counter", 8/);
-  assert.match(snapshot, /priorScore \+ supportPoints - counterPoints/);
+  // 计分公式与实现已在共享模块 evidence-scoring.ts 中。
+  assert.match(scoring, /priorScore \+ supportPoints - counterPoints/);
 });
 
 test("all presentation and collaboration surfaces consume one diagnostic snapshot", async () => {
@@ -50,16 +75,18 @@ test("all presentation and collaboration surfaces consume one diagnostic snapsho
 });
 
 test("evidence gate blocks premature confirmation on client and server", async () => {
-  const [snapshot, app, feishuRoute, reviewRoute] = await Promise.all([
+  const [scoring, snapshot, reviewBox, feishuRoute, reviewRoute] = await Promise.all([
+    read("app/lib/evidence-scoring.ts"),
     read("app/lib/diagnostic-snapshot.ts"),
-    read("app/DriveLensApp.tsx"),
+    read("app/components/ReviewBox.tsx"),
     read("app/api/feishu/route.ts"),
     read("app/api/feishu/review/route.ts"),
   ]);
-  assert.match(snapshot, /mode !== "scene_verified"/);
-  assert.match(snapshot, /completeness < thresholdPercent/);
-  assert.match(snapshot, /top1Margin < 10/);
-  assert.match(app, /disabled={!snapshot\.gate\.canConfirm}/);
+  assert.match(scoring, /mode !== "scene_verified"/);
+  assert.match(scoring, /completeness < thresholdPercent/);
+  assert.match(scoring, /top1Margin < 10/);
+  assert.match(snapshot, /evaluateEvidenceGate\(/);
+  assert.match(reviewBox, /disabled=\{!snapshot\.gate\.canConfirm\}/);
   assert.match(feishuRoute, /evidence_gate_blocked/);
   assert.match(feishuRoute, /status: 422/);
   assert.match(reviewRoute, /stale_snapshot/);
@@ -98,7 +125,7 @@ test("robustness and fingerprint claims stay within prototype boundaries", async
 });
 
 test("competition-only modules have complete presentation styles", async () => {
-  const css = await read("app/drivelens.css");
+  const css = await readAppSources();
   for (const className of [
     "pitch-strip",
     "evidence-challenge",
@@ -122,7 +149,7 @@ test("Feishu AI layer provides grounded chat, evidence tasks, and cited knowledg
     read("app/lib/feishu-ai.ts"),
     read("app/api/feishu-ai/route.ts"),
     read("docs/FEISHU_AI_INTEGRATION.md"),
-    read("app/drivelens.css"),
+    readAppSources(),
   ]);
   assert.match(app, /FeishuAICopilot/);
   assert.match(component, /对话式诊断/);
@@ -142,7 +169,7 @@ test("Feishu AI layer provides grounded chat, evidence tasks, and cited knowledg
 
 test("real-case mode preserves evidence boundaries across UI and APIs", async () => {
   const [app, boundary, resolver, realDiagnostic, challenge, depth, diagnose, feishu, feishuAi, card, css] = await Promise.all([
-    read("app/DriveLensApp.tsx"),
+    readAppSources(),
     read("app/components/RealCaseBoundaryNotice.tsx"),
     read("app/lib/incident-resolver.ts"),
     read("app/lib/real-diagnostic.ts"),
@@ -152,7 +179,7 @@ test("real-case mode preserves evidence boundaries across UI and APIs", async ()
     read("app/api/feishu/route.ts"),
     read("app/api/feishu-ai/route.ts"),
     read("app/lib/feishu-card.ts"),
-    read("app/drivelens.css"),
+    readAppSources(),
   ]);
   assert.match(app, /真实 RCA 派生案例/);
   assert.match(app, /不排序核验方向/);
@@ -263,8 +290,8 @@ test("Feishu surfaces handle a real-case snapshot with no supported directions",
       "const buildIncidentReviewCard = () => ({}); const sendFeishuInteractiveCard = async () => ({ ok: false });",
     )
     .replace(
-      /import \{ resolveIncident \} from "\.\.\/\.\.\/lib\/incident-resolver";/,
-      "const resolveIncident = () => globalThis.__drivelensEmptyResolved;",
+      /import \{ resolveIncident, resolveIncidentStrict \} from "\.\.\/\.\.\/lib\/incident-resolver";/,
+      "const resolveIncident = () => globalThis.__drivelensEmptyResolved; const resolveIncidentStrict = () => ({ ok: true, resolved: globalThis.__drivelensEmptyResolved });",
     )
     .replace(/import type \{ EvidenceMode \} from "\.\.\/\.\.\/lib\/diagnostic-snapshot";/, "")
     .replace("function buildFields(body: SyncRequest)", "export function buildFields(body: SyncRequest)");

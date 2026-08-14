@@ -1,0 +1,154 @@
+/* DriveLens 样式分片 15-engagement.css · 由 drivelens.css 汇总导入 */
+/* ═══ P1-b: Ready 引导提示 ═══ */
+.ready-prompt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  min-height: 320px;
+  padding: 30px 20px;
+}
+
+.ready-prompt .ready-icon {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px dashed rgba(0, 180, 255, 0.3);
+  background: radial-gradient(circle, rgba(0, 180, 255, 0.06) 0 40%, transparent 41%);
+  color: var(--blue-strong);
+  font-size: 32px;
+  animation: ready-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes ready-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.ready-prompt strong {
+  font-size: 15px;
+  color: var(--text-1);
+  line-height: 1.5;
+}
+
+.ready-prompt small {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 260px;
+}
+
+.ready-prompt .ready-arrow {
+  color: var(--blue-strong);
+  font-size: 22px;
+  animation: ready-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes ready-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* ═══ P2-b: 事件卡片精简模式 ═══ */
+.incident-card.compact {
+  padding: 10px 12px;
+}
+
+.incident-card.compact dl {
+  display: none;
+}
+
+.incident-card.compact > strong {
+  font-size: 13px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.incident-card.compact.real-case-card > strong {
+  display: -webkit-box;
+  margin: 7px 0 5px;
+  overflow: hidden;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.incident-card.compact > span {
+  font-size: 11px;
+}
+
+.incident-card.compact .incident-card-top {
+  margin-bottom: 6px;
+}
+
+.mc-counter strong i {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-left: 3px;
+}
+
+.mc-rate {
+  color: var(--blue-strong) !important;
+}
+
+.mc-rate small {
+  font-size: 13px !important;
+  color: var(--text-3);
+  margin-left: 1px;
+}
+
+.mc-progress-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.mc-progress-bar b {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), var(--cyan));
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+.mc-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 180, 255, 0.04);
+  border: 1px solid rgba(0, 180, 255, 0.1);
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.mc-status-line small {
+  margin-left: auto;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.mc-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue);
+  animation: mc-pulse-anim 1s ease-in-out infinite;
+}
+
+@keyframes mc-pulse-anim {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+

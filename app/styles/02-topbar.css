@@ -1,0 +1,165 @@
+/* DriveLens 样式分片 02-topbar.css · 由 drivelens.css 汇总导入 */
+/* ═══ App Shell ═══ */
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 58% -20%, rgba(0, 180, 255, 0.08), transparent 40%),
+    radial-gradient(ellipse at 20% 80%, rgba(0, 229, 204, 0.04), transparent 35%),
+    var(--bg-void);
+}
+
+/* ═══ Topbar ═══ */
+.topbar {
+  height: 62px;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 0 22px;
+  background: var(--glass-2);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.brand-block, .topbar-center, .topbar-actions,
+.incident-card-top, .hero-meta, .hero-actions,
+.section-heading, .diagnosis-head, .review-heading,
+.drawer-head, .drawer-actions {
+  display: flex;
+  align-items: center;
+}
+
+.brand-block { gap: 12px; }
+
+.brand-mark {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: 11px;
+  color: var(--blue-strong);
+  background: linear-gradient(135deg, rgba(0, 180, 255, 0.15), rgba(0, 229, 204, 0.08));
+  border: 1px solid rgba(0, 180, 255, 0.25);
+  font-size: 12px; font-weight: 800;
+  letter-spacing: -0.03em;
+  box-shadow: 0 0 16px rgba(0, 180, 255, 0.2);
+}
+
+.brand-block div { display: grid; gap: 2px; }
+
+.brand-block strong {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+
+.brand-block small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.topbar-center { justify-content: center; gap: 12px; }
+
+.mode-pill, .agent-mode, .risk-label, .status-pill,
+.risk-dot, .task-id, .fact-only, .data-state {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.mode-pill {
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(0, 214, 143, 0.08);
+  border: 1px solid rgba(0, 214, 143, 0.2);
+  color: var(--green);
+  font-size: 11px; font-weight: 700;
+}
+
+.mode-pill i, .sync-status i, .toast i {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(0, 214, 143, 0.12), 0 0 8px var(--green);
+}
+
+.boundary-copy {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.topbar-actions { justify-content: flex-end; gap: 9px; }
+
+/* ═══ Buttons ═══ */
+.primary-button, .secondary-button, .ghost-button {
+  min-height: 42px;
+  border-radius: var(--radius-md);
+  padding: 0 16px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 13px; font-weight: 700;
+  transition: all 200ms ease;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--blue), var(--blue-2));
+  color: #fff;
+  border: 1px solid rgba(0, 180, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 180, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--blue-strong), var(--blue));
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(0, 180, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.primary-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 4px 16px rgba(0, 180, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.primary-button:disabled { opacity: 0.5; cursor: wait; }
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible {
+  outline: 2px solid var(--blue-strong);
+  outline-offset: 2px;
+}
+
+.primary-button.compact, .ghost-button { min-height: 36px; }
+.primary-button.full { width: 100%; }
+
+.secondary-button {
+  border-color: var(--border-strong);
+  background: var(--glass-2);
+  color: var(--text-1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.secondary-button:hover {
+  background: var(--glass-hover);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+
+.secondary-button:active {
+  transform: translateY(0);
+}
+
+.ghost-button {
+  background: transparent;
+  color: var(--text-2);
+}
+
+.ghost-button:hover {
+  background: var(--glass-1);
+  color: var(--text-1);
+}
+

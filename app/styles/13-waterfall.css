@@ -1,0 +1,192 @@
+/* DriveLens 样式分片 13-waterfall.css · 由 drivelens.css 汇总导入 */
+/* ═══════════════════════════════════════════════════════════
+   MonteCarloWaterfall · 100 次扰动试验瀑布动画
+   ═══════════════════════════════════════════════════════════ */
+
+.mc-waterfall {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 13px;
+  background: var(--glass-1);
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 640px) {
+  .topbar-actions .ghost-button { display: none; }
+
+  .ai-entry-button {
+    min-height: 36px;
+    padding: 0 11px;
+  }
+
+  .evidence-workbench,
+  .diagnosis-panel {
+    padding: 12px;
+  }
+
+  .ai-copilot-backdrop {
+    padding: 0;
+  }
+
+  .ai-copilot {
+    width: 100vw;
+    height: 100dvh;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .ai-copilot-head {
+    grid-template-columns: 38px minmax(0, 1fr) 36px;
+    padding: 10px 12px;
+  }
+
+  .ai-brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .ai-copilot-head h2 {
+    font-size: 16px;
+  }
+
+  .ai-capability-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-capability-strip article {
+    min-height: 44px;
+    padding: 7px 12px;
+  }
+
+  .ai-copilot-body {
+    height: calc(100dvh - 218px);
+  }
+
+  .ai-chat-column,
+  .ai-action-column {
+    padding: 12px;
+  }
+
+  .ai-chat-column {
+    min-height: 500px;
+  }
+
+  .ai-message {
+    max-width: 96%;
+  }
+
+  .ai-action-head {
+    align-items: flex-start;
+  }
+
+  .adapter-badge {
+    white-space: normal;
+    text-align: right;
+  }
+
+  .real-case-boundary-copy p,
+  .hero-copy p {
+    font-size: 12px;
+  }
+
+  .drawer-actions,
+  .decision-segment {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 5px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border);
+}
+
+.mc-cell {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 8px;
+  font-family: var(--font-mono);
+  color: var(--text-3);
+  animation: mc-cell-pop 300ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  transition: all 200ms ease;
+}
+
+.mc-cell.pending {
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.mc-cell.stable {
+  background: rgba(0, 214, 143, 0.12);
+  border-color: rgba(0, 214, 143, 0.35);
+  color: var(--green);
+  box-shadow: 0 0 8px rgba(0, 214, 143, 0.15);
+}
+
+.mc-cell.partial {
+  background: rgba(255, 165, 2, 0.1);
+  border-color: rgba(255, 165, 2, 0.3);
+  color: var(--orange);
+}
+
+.mc-cell.flip {
+  background: rgba(255, 71, 87, 0.1);
+  border-color: rgba(255, 71, 87, 0.3);
+  color: var(--red);
+}
+
+.mc-cell-idx {
+  font-size: 7px;
+  opacity: 0.6;
+}
+
+@keyframes mc-cell-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.mc-counters {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.mc-counter {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--glass-2);
+  border: 1px solid var(--border);
+  transition: all 200ms ease;
+}
+
+.mc-counter.active {
+  border-color: rgba(0, 180, 255, 0.3);
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.08);
+}
+
+.mc-counter span {
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+.mc-counter strong {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+

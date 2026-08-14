@@ -1,0 +1,232 @@
+/* DriveLens 样式分片 04-workspace.css · 由 drivelens.css 汇总导入 */
+/* ═══ Workspace ═══ */
+.workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(650px, 1fr) 410px;
+  height: calc(100vh - 130px);
+  min-height: 650px;
+}
+
+.incident-sidebar, .diagnosis-panel {
+  overflow-y: auto;
+  background: var(--glass-1);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.incident-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 8px 12px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--blue);
+  font-size: 11px; font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar-heading h2, .section-heading h2, .diagnosis-head h2,
+.drawer-head h2, .review-heading h3 {
+  margin: 0;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+
+.sidebar-heading h2 { font-size: 16px; }
+
+.count-badge {
+  display: grid; place-items: center;
+  min-width: 26px; height: 26px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 180, 255, 0.1);
+  border: 1px solid rgba(0, 180, 255, 0.2);
+  color: var(--blue-strong);
+  font-family: var(--font-mono);
+  font-size: 12px; font-weight: 800;
+}
+
+/* ═══ Incident Cards ═══ */
+.incident-list { display: grid; gap: 8px; }
+
+.incident-card {
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--glass-1);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all 200ms ease;
+}
+
+.incident-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-hover);
+  background: var(--glass-2);
+  box-shadow: 0 8px 24px rgba(0, 180, 255, 0.1);
+}
+
+.incident-card.active {
+  border-color: rgba(0, 180, 255, 0.5);
+  background: var(--glass-3);
+  box-shadow: 0 10px 30px rgba(0, 180, 255, 0.15), inset 3px 0 0 var(--blue);
+}
+
+.incident-card-top {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.risk-dot { gap: 6px; font-size: 10px; font-weight: 700; }
+
+.risk-dot::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.risk-dot.danger::before, .risk-label.danger {
+  background: rgba(255, 71, 87, 0.12);
+  color: var(--red);
+}
+
+.risk-dot.danger::before {
+  background: var(--red);
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.5);
+}
+
+.risk-dot.warning::before, .risk-label.warning {
+  background: rgba(255, 165, 2, 0.12);
+  color: var(--orange);
+}
+
+.risk-dot.warning::before {
+  background: var(--orange);
+  box-shadow: 0 0 8px rgba(255, 165, 2, 0.5);
+}
+
+.status-pill {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  font-size: 11px; font-weight: 700;
+}
+
+.status-pill.closed {
+  background: rgba(0, 214, 143, 0.08);
+  color: var(--green);
+}
+
+.status-pill.stale {
+  background: rgba(255, 165, 2, 0.1);
+  color: var(--orange);
+}
+
+.data-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 180, 255, 0.22);
+  border-radius: 6px;
+  background: rgba(0, 180, 255, 0.08);
+  color: var(--blue-strong);
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.incident-card > strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.incident-card > span {
+  color: var(--text-3);
+  font: 11px var(--font-mono);
+}
+
+.incident-card dl { display: grid; gap: 5px; margin: 11px 0 0; }
+
+.incident-card dl div, .payload-preview div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.incident-card dt, .incident-card dd { margin: 0; font-size: 11px; }
+
+.incident-card dt { color: var(--text-3); }
+
+.incident-card dd {
+  color: var(--text-2);
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.incident-card.real-case-card {
+  padding: 12px;
+}
+
+.incident-card.real-case-card > strong {
+  display: -webkit-box;
+  margin: 7px 0 5px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.real-case-card-meta {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+/* ═══ Sidebar Foot ═══ */
+.sidebar-foot {
+  display: grid;
+  gap: 4px;
+  margin-top: auto;
+  padding: 13px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(0, 180, 255, 0.08), rgba(0, 229, 204, 0.04));
+  border: 1px solid rgba(0, 180, 255, 0.15);
+  color: var(--text-1);
+}
+
+.sidebar-foot span, .sidebar-foot small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.sidebar-foot strong {
+  font-size: 17px;
+  font-family: var(--font-mono);
+  color: var(--blue-strong);
+}
+

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveIncident } from "../../../lib/incident-resolver";
+import { resolveIncidentStrict } from "../../../lib/incident-resolver";
 import type { EvidenceMode } from "../../../lib/diagnostic-snapshot";
 
 const reviewActions = ["accept_top1", "request_evidence", "escalate"] as const;
@@ -136,9 +136,9 @@ export async function POST(request: Request) {
   const parsed = parseReview(rawBody as ReviewRequest);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
-  const resolved = resolveIncident(parsed.review.eventId, parsed.review.evidenceMode);
-  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
-  const { snapshot } = resolved;
+  const strict = resolveIncidentStrict(parsed.review.eventId, parsed.review.evidenceMode);
+  if (!strict.ok) return NextResponse.json({ error: strict.error }, { status: strict.status });
+  const { snapshot } = strict.resolved;
   if (parsed.review.snapshotId && parsed.review.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
@@ -204,6 +204,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+      signal: AbortSignal.timeout(10_000),
     });
     const tokenPayload = (await tokenResponse.json()) as TenantTokenResponse;
     if (!tokenResponse.ok || tokenPayload.code !== 0 || !tokenPayload.tenant_access_token) {
@@ -219,6 +220,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json; charset=utf-8",
         },
         body: JSON.stringify({ fields: fieldPayload.selectedFields }),
+        signal: AbortSignal.timeout(15_000),
       },
     );
     const updatePayload = (await updateResponse.json()) as UpdateRecordResponse;

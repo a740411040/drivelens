@@ -1,8 +1,26 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
+
+/** 组件拆分后文案分散在 app/components 与 app/styles；汇总读取全部源码。 */
+async function readAppSources() {
+  const parts = [];
+  const walk = async (dir) => {
+    const entries = await readdir(new URL(`../${dir}`, import.meta.url), { withFileTypes: true });
+    for (const entry of entries) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        await walk(rel);
+      } else if (/\.(ts|tsx|css)$/.test(entry.name)) {
+        parts.push(await read(rel));
+      }
+    }
+  };
+  await walk("app");
+  return parts.join("\n");
+}
 
 test("ships three deterministic demo incidents", async () => {
   const source = await read("app/lib/demo-data.ts");
@@ -13,7 +31,7 @@ test("ships three deterministic demo incidents", async () => {
 });
 
 test("keeps human review and counter-evidence visible", async () => {
-  const source = await read("app/DriveLensApp.tsx");
+  const source = await readAppSources();
   assert.match(source, /模型只做解释/);
   assert.match(source, /证据贡献账本/);
   assert.match(source, /证据门禁/);

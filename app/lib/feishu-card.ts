@@ -135,6 +135,7 @@ export async function sendFeishuInteractiveCard(input: {
           msg_type: "interactive",
           content: JSON.stringify(input.card),
         }),
+        signal: AbortSignal.timeout(15_000),
       },
     );
     const payload = (await response.json().catch(() => null)) as unknown;

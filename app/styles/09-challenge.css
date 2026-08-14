@@ -1,0 +1,363 @@
+/* DriveLens 样式分片 09-challenge.css · 由 drivelens.css 汇总导入 */
+/* ═══ Evidence Challenge ═══ */
+.evidence-challenge {
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255, 165, 2, 0.2);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 165, 2, 0.03), var(--glass-2));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  scroll-margin-top: 18px;
+}
+
+.evidence-challenge.verified {
+  border-color: rgba(0, 214, 143, 0.2);
+  background:
+    linear-gradient(135deg, rgba(0, 214, 143, 0.03), var(--glass-2));
+}
+
+.challenge-head, .challenge-metrics, .challenge-before,
+.evidence-item-meta, .falsification-result, .score-ledger > div,
+.gate-panel, .workflow-path {
+  display: flex;
+  align-items: center;
+}
+
+.challenge-head {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.challenge-head h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.03em;
+  color: var(--text-1);
+}
+
+.challenge-metrics { gap: 9px; }
+
+.evidence-completeness, .gate-badge {
+  min-width: 142px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--glass-1);
+}
+
+.evidence-completeness span, .evidence-completeness small, .gate-badge span {
+  display: block;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.evidence-completeness strong, .gate-badge strong {
+  display: block;
+  margin: 2px 0;
+  font-size: 16px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+
+.evidence-completeness i {
+  height: 5px;
+  display: block;
+  margin-top: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.evidence-completeness i b {
+  height: 100%;
+  display: block;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--orange), #ffd166);
+  transition: width 500ms ease;
+}
+
+.verified .evidence-completeness i b {
+  background: linear-gradient(90deg, var(--green), #4af0a8);
+}
+
+.gate-badge { min-width: 178px; }
+
+.gate-badge.blocked {
+  border-color: rgba(255, 71, 87, 0.25);
+  background: rgba(255, 71, 87, 0.05);
+}
+
+.gate-badge.blocked strong { color: var(--red); }
+
+.gate-badge.passed {
+  border-color: rgba(0, 214, 143, 0.25);
+  background: rgba(0, 214, 143, 0.05);
+}
+
+.gate-badge.passed strong { color: var(--green); }
+
+.challenge-before {
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.challenge-question, .challenge-button {
+  min-height: 94px;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.challenge-question {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  border: 1px dashed rgba(255, 165, 2, 0.3);
+  background: var(--glass-1);
+}
+
+.challenge-question span, .challenge-question small, .challenge-button small {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.challenge-question strong {
+  font-size: 15px;
+  color: var(--text-1);
+}
+
+.challenge-button {
+  min-width: 330px;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-content: center;
+  column-gap: 10px;
+  border: 1px solid rgba(255, 165, 2, 0.3);
+  background: linear-gradient(135deg, rgba(255, 165, 2, 0.15), rgba(255, 165, 2, 0.08));
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(255, 165, 2, 0.12);
+  transition: all 180ms ease;
+}
+
+.challenge-button:hover {
+  background: linear-gradient(135deg, rgba(255, 165, 2, 0.2), rgba(255, 165, 2, 0.12));
+  transform: translateY(-1px);
+}
+
+.challenge-button > span {
+  grid-row: 1 / 3;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 22px;
+}
+
+.challenge-button strong { font-size: 14px; color: #fff; }
+.challenge-button small { color: rgba(255, 255, 255, 0.7); }
+
+/* ═══ Ranking Shift ═══ */
+.ranking-shift {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.ranking-shift article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 8px;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--glass-1);
+}
+
+.ranking-shift article div { min-width: 0; }
+
+.ranking-shift article div span, .ranking-shift article div small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-shift article div span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.ranking-shift article div small {
+  color: var(--text-2);
+  font-size: 10px;
+}
+
+.ranking-shift article > strong {
+  grid-column: 1;
+  font-size: 20px;
+  color: var(--text-1);
+  font-family: var(--font-mono);
+}
+
+.ranking-shift article > strong i {
+  margin: 0 5px;
+  color: var(--text-3);
+  font-size: 13px;
+  font-style: normal;
+}
+
+.ranking-shift article > b {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+  padding: 5px 7px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.ranking-shift article.up > b {
+  background: rgba(0, 214, 143, 0.1);
+  color: var(--green);
+}
+
+.ranking-shift article.down > b {
+  background: rgba(255, 71, 87, 0.1);
+  color: var(--red);
+}
+
+.ranking-shift article.gate-shift {
+  border-color: rgba(0, 214, 143, 0.25);
+  background: rgba(0, 214, 143, 0.05);
+}
+
+.ranking-shift article.gate-shift > b {
+  background: var(--green);
+  color: #fff;
+}
+
+/* ═══ Supplemental Evidence ═══ */
+.supplemental-evidence-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.supplemental-evidence-list > article {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--glass-1);
+  animation: evidence-in 420ms ease both;
+}
+
+@keyframes evidence-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.evidence-item-meta {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.evidence-item-meta time {
+  color: var(--text-2);
+  font: 11px var(--font-mono);
+}
+
+.evidence-item-meta span {
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(0, 180, 255, 0.08);
+  color: var(--blue-strong);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.supplemental-evidence-list > article > strong {
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.supplemental-evidence-list > article > small {
+  min-height: 34px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.effect-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+.effect-tags em {
+  padding: 4px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.effect-tags em.support {
+  background: rgba(0, 214, 143, 0.1);
+  color: var(--green);
+}
+
+.effect-tags em.counter {
+  background: rgba(255, 71, 87, 0.1);
+  color: var(--red);
+}
+
+.falsification-result {
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px dashed rgba(0, 214, 143, 0.25);
+  border-radius: 10px;
+  background: var(--glass-1);
+}
+
+.falsification-result > div {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+
+.falsification-result span, .falsification-result small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.falsification-result strong {
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.falsification-result > b {
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: var(--green);
+  color: #fff;
+  font-size: 11px;
+}
+
+.falsification-result button {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 11px;
+  text-decoration: underline;
+}
+

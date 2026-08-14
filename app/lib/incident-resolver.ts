@@ -43,3 +43,33 @@ export function resolveIncident(
     realCase,
   };
 }
+
+export type StrictResolveError =
+  | "unknown_event"
+  | "real_case_supplement_unsupported";
+
+export type StrictResolveOutcome =
+  | { ok: true; resolved: ResolvedIncident }
+  | { ok: false; status: 400 | 404; error: StrictResolveError };
+
+/**
+ * 严格解析：真实案例没有现场补证阶段，scene_verified 请求会被
+ * createRealCaseSnapshot 静默降级为 logs_only。为了让 API 消费者看到
+ * 明确错误而不是收到一个“看起来是 V1 实际是 L0”的快照，这里直接拒绝。
+ */
+export function resolveIncidentStrict(
+  eventId: string | undefined,
+  mode: EvidenceMode = "logs_only",
+): StrictResolveOutcome {
+  if (!eventId) return { ok: false, status: 404, error: "unknown_event" };
+  if (mode === "scene_verified" && getRealCaseById(eventId)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "real_case_supplement_unsupported",
+    };
+  }
+  const resolved = resolveIncident(eventId, mode);
+  if (!resolved) return { ok: false, status: 404, error: "unknown_event" };
+  return { ok: true, resolved };
+}

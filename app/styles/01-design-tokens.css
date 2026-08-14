@@ -1,0 +1,89 @@
+/* DriveLens 样式分片 01-design-tokens.css · 由 drivelens.css 汇总导入 */
+/* ═══════════════════════════════════════════════════════════
+   DriveLens — Smart EV / Intelligent Driving System UI
+   深色科技风 · 毛玻璃 Glassmorphism · 等宽数据字体
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 深空背景层 ── */
+  --bg-void: #04060c;
+  --bg-deep: #080b14;
+  --bg-base: #0c1018;
+
+  /* ── 毛玻璃表面 ── */
+  --glass-1: rgba(16, 22, 36, 0.45);
+  --glass-2: rgba(20, 28, 44, 0.55);
+  --glass-3: rgba(26, 36, 56, 0.65);
+  --glass-hover: rgba(30, 42, 64, 0.7);
+
+  /* ── 科技强调色 ── */
+  --blue: #00b4ff;
+  --blue-2: #0090d4;
+  --blue-strong: #00d4ff;
+  --cyan: #00e5cc;
+  --green: #00d68f;
+  --red: #ff4757;
+  --orange: #ffa502;
+  --purple: #a78bfa;
+
+  /* ── 文本层级（提升对比度，WCAG AA） ── */
+  --text-1: #e8ecf4;
+  --text-2: #9db0cc;
+  --text-3: #7286a0;
+
+  /* ── 边框 ── */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(0, 180, 255, 0.3);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* ── 阴影与微光 ── */
+  --shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --glow-blue: 0 0 20px rgba(0, 180, 255, 0.15);
+
+  /* ── 门禁状态色 ── */
+  --gate-blocked: #ff4757;
+  --gate-warning: #ffa502;
+  --gate-passed: #00d68f;
+
+  /* ── 字体 ── */
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  --font-sans: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* ── 4px 间距标度 ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* ── 兼容旧变量 ── */
+  --ink: var(--text-1);
+  --navy: #0d1424;
+  --muted: var(--text-2);
+  --line: var(--border);
+  --soft-line: var(--border);
+  --surface: var(--glass-2);
+  --canvas: var(--bg-void);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-width: 0;
+  min-height: 100%;
+  background: var(--bg-void);
+  color: var(--text-1);
+  font-family: var(--font-sans);
+}
+
+button, textarea { font: inherit; }
+button { color: inherit; }
+

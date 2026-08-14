@@ -1,4 +1,4 @@
-﻿/**
+/**
  * real-diagnostic.ts
  *
  * 将真实RCA案例（来自 real-data/cases/ 下的JSON文件）映射到
@@ -20,7 +20,6 @@ import type {
 import type {
   DiagnosticSnapshot,
   EvidenceEffect,
-  EvidenceGate,
   EvidenceGateBlocker,
   EvidenceItem,
   EvidenceMode,
@@ -28,9 +27,8 @@ import type {
   EvidenceScenario,
   EvidenceSource,
   FalsificationExperiment,
-  RankedHypothesis,
-  ScoredContribution,
 } from "./diagnostic-snapshot";
+import { decorateHypothesis, evaluateEvidenceGate } from "./evidence-scoring";
 
 // 真实案例 JSON 数据导入
 import case001 from "./real-data/cases/RCA-EXT-001.json";
@@ -780,97 +778,24 @@ export function getRealCaseEvidenceScenarios(): Record<string, EvidenceScenario>
   return scenarios;
 }
 
-// ========== 诊断快照核心逻辑（从 diagnostic-snapshot.ts 复制，因原始内部函数未导出） ==========
+// ========== 诊断快照核心逻辑 ==========
+// 计分与门禁复用 evidence-scoring.ts 的共享实现（真实案例强制注入边界阻断项）。
 
-const clampScore = (value: number): number =>
-  Math.max(0, Math.min(100, Math.round(value)));
+const REAL_CASE_GATE_BLOCKERS: EvidenceGateBlocker[] = [
+  "raw_evidence_missing",
+  "scoring_unavailable",
+  "independent_review_missing",
+];
 
-/** 疑因装饰器：计算先验分、支持分、反证分，生成 RankedHypothesis */
-function decorateHypothesisReal(
-  hypothesis: Hypothesis,
-  priorScore: number,
-  activeEvidence: EvidenceItem[],
-): RankedHypothesis {
-  const contributions: ScoredContribution[] = activeEvidence.flatMap((item) =>
-    item.effects
-      .filter((itemEffect) => itemEffect.hypothesisId === hypothesis.id)
-      .map((itemEffect) => ({
-        ...itemEffect,
-        evidenceId: item.id,
-        evidenceTitle: item.title,
-        source: item.source,
-        signedPoints: itemEffect.polarity === "support" ? itemEffect.points : -itemEffect.points,
-      })),
-  );
-  const supportPoints = contributions
-    .filter((item) => item.polarity === "support")
-    .reduce((sum, item) => sum + item.points, 0);
-  const counterPoints = contributions
-    .filter((item) => item.polarity === "counter")
-    .reduce((sum, item) => sum + item.points, 0);
-  const supplementalIds = new Set(
-    activeEvidence.filter((item) => item.stage === "supplemental").map((item) => item.id),
-  );
-  const supplementalSupport = contributions
-    .filter((item) => item.polarity === "support" && supplementalIds.has(item.evidenceId))
-    .map((item) => `${item.source}：${item.evidenceTitle}（+${item.points}）`);
-  const supplementalCounter = contributions
-    .filter((item) => item.polarity === "counter")
-    .map((item) => `${item.source}：${item.evidenceTitle}（−${item.points}）`);
-  const resolvedPatterns = activeEvidence.flatMap((item) => item.resolves ?? []);
-
-  return {
-    ...hypothesis,
-    score: clampScore(priorScore + supportPoints - counterPoints),
-    rank: 0,
-    priorScore,
-    supportPoints,
-    counterPoints,
-    contributions,
-    support: [...hypothesis.support, ...supplementalSupport],
-    counterEvidence: [...hypothesis.counterEvidence, ...supplementalCounter],
-    missing: hypothesis.missing.filter(
-      (item) => !resolvedPatterns.some((pattern) => item.includes(pattern)),
-    ),
-  };
-}
-
-/** 证据门禁评估：检查覆盖率、首位分值、差距、反证、证伪实验等条件 */
-function evaluateEvidenceGateReal(
-  _mode: EvidenceMode,
-  completeness: number,
-  thresholdPercent: number,
-  hypotheses: RankedHypothesis[],
-  experiment: FalsificationExperiment,
-): EvidenceGate {
-  const top = hypotheses[0];
-  const runnerUp = hypotheses[1];
-  const top1Margin = Math.max(0, (top?.score ?? 0) - (runnerUp?.score ?? 0));
-  const blockers: EvidenceGateBlocker[] = [];
-
-  blockers.push("raw_evidence_missing", "scoring_unavailable", "independent_review_missing");
-  if (completeness < thresholdPercent) blockers.push("low_completeness");
-  if (!top || top.counterEvidence.length === 0) blockers.push("counter_unassessed");
-  if (experiment.verdict === "待执行" || experiment.verdict === "证据不足") blockers.push("falsification_pending");
-
-  const canConfirm = false;
-
-  return {
-    state: canConfirm ? "reviewable" : "blocked",
-    canConfirm,
-    completeness,
-    top1Score: top?.score ?? 0,
-    top1Margin,
-    blockers,
-    message: `当前仅有真实案例派生元数据，禁止确认根因；需补齐原始证据与独立工程复核`,
-  };
-}
+const REAL_CASE_GATE_MESSAGE =
+  "当前仅有真实案例派生元数据，禁止确认根因；需补齐原始证据与独立工程复核";
 
 /**
  * 创建真实案例诊断快照
  *
  * 复制 createDiagnosticSnapshot 的核心逻辑，但使用传入的场景
  * 而非从全局 evidenceScenarios 查找，从而支持真实案例ID。
+ * 真实案例没有现场补证阶段，任何 EvidenceMode 都按仅日志视角处理。
  */
 export function createRealCaseSnapshot(
   realCase: RealCase,
@@ -890,19 +815,25 @@ export function createRealCaseSnapshot(
     : 0;
 
   const hypotheses = incident.hypotheses
-    .map((hypothesis) => decorateHypothesisReal(
+    .map((hypothesis) => decorateHypothesis(
       hypothesis,
       scenario.priorScores[hypothesis.id] ?? hypothesis.score,
       activeItems,
     ))
     .map((hypothesis) => ({ ...hypothesis, rank: 0 }));
 
-  const gate = evaluateEvidenceGateReal(
+  const gate = evaluateEvidenceGate(
     mode,
     completeness,
     scenario.coverage.thresholdPercent,
     hypotheses,
     scenario.experiment,
+    {
+      mandatoryBlockers: REAL_CASE_GATE_BLOCKERS,
+      skipSceneEvidenceCheck: true,
+      skipScoreChecks: true,
+      message: REAL_CASE_GATE_MESSAGE,
+    },
   );
   const metadata = realCase.evidence.signal_metadata;
   const anchor: RealCaseTimelineSemantics["anchor"] = metadata.issue_anchor_s === null

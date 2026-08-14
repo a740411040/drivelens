@@ -4,7 +4,7 @@ import {
   buildFeishuAIAnswer,
   type EvidenceTask,
 } from "../../lib/feishu-ai";
-import { resolveIncident } from "../../lib/incident-resolver";
+import { resolveIncidentStrict } from "../../lib/incident-resolver";
 import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 type FeishuAIAction = "chat" | "create_tasks";
@@ -56,6 +56,7 @@ async function getTenantAccessToken(appId: string, appSecret: string): Promise<s
     method: "POST",
     headers: { "Content-Type": "application/json; charset=utf-8" },
     body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+    signal: AbortSignal.timeout(10_000),
   });
   const payload = (await response.json()) as TenantTokenResponse;
   if (!response.ok || payload.code !== 0 || !payload.tenant_access_token) {
@@ -84,6 +85,7 @@ async function batchCreateTasks(input: {
       body: JSON.stringify({
         records: input.tasks.map((task) => ({ fields: taskFields(task, input.replayUrl) })),
       }),
+      signal: AbortSignal.timeout(15_000),
     },
   );
   const payload = (await response.json()) as BatchRecordResponse;
@@ -105,9 +107,11 @@ export async function POST(request: Request) {
   }
 
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified" ? "scene_verified" : "logs_only";
-  const resolved = body.eventId ? resolveIncident(body.eventId, evidenceMode) : undefined;
-  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
-  const { incident, snapshot, source } = resolved;
+  const strict = resolveIncidentStrict(body.eventId, evidenceMode);
+  if (!strict.ok) {
+    return NextResponse.json({ error: strict.error }, { status: strict.status });
+  }
+  const { incident, snapshot, source } = strict.resolved;
   if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },

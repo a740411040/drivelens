@@ -1,0 +1,117 @@
+/* DriveLens 样式分片 18-outbox.css · 由 drivelens.css 汇总导入 */
+
+/* ═══ Outbox（本地待同步队列） ═══ */
+
+.outbox-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 165, 2, 0.35);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 165, 2, 0.07), rgba(0, 180, 255, 0.04));
+  display: grid;
+  gap: 10px;
+}
+
+.outbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.outbox-head span {
+  font: 600 13px/1.4 var(--font-sans);
+  color: var(--text-1);
+}
+
+.outbox-head b {
+  min-width: 24px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 165, 2, 0.16);
+  color: var(--orange);
+  font: 700 12px/1.6 var(--font-mono);
+  text-align: center;
+}
+
+.outbox-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 16, 26, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.outbox-entry-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.outbox-entry-meta strong {
+  font: 600 13px var(--font-mono);
+  color: var(--orange);
+}
+
+.outbox-entry-meta small {
+  font: 11px/1.5 var(--font-sans);
+  color: var(--text-3);
+}
+
+.outbox-entry-meta em {
+  font-style: normal;
+  font: 11px/1.5 var(--font-sans);
+  color: var(--orange);
+}
+
+.outbox-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ═══ Feishu AI Copilot 任务 outbox ═══ */
+
+.task-outbox {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
+.task-outbox-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 16, 26, 0.55);
+  border: 1px solid rgba(255, 165, 2, 0.25);
+}
+
+.task-outbox-meta {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task-outbox-meta strong {
+  font: 600 12px var(--font-mono);
+  color: var(--orange);
+}
+
+.task-outbox-meta small {
+  font: 11px/1.5 var(--font-sans);
+  color: var(--text-3);
+}
+
+.task-outbox-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}

@@ -1,0 +1,433 @@
+/* DriveLens 样式分片 16-polish.css · 由 drivelens.css 汇总导入 */
+/* ═══════════════════════════════════════════════════════════
+   EvidenceGateFlow · 证据门禁状态机
+   ═══════════════════════════════════════════════════════════ */
+
+.gate-flow {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--glass-1);
+  border: 1px solid var(--border);
+}
+
+.gate-flow-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.gate-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  transition: all 400ms ease;
+}
+
+.gate-node-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: var(--glass-2);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 800;
+  transition: all 400ms ease;
+  flex-shrink: 0;
+}
+
+.gate-node-body { display: grid; gap: 1px; }
+
+.gate-node-body small {
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+.gate-node-body strong {
+  color: var(--text-1);
+  font-size: 13px;
+}
+
+.gate-node--passed .gate-node-icon {
+  background: rgba(0, 214, 143, 0.12);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(0, 214, 143, 0.15);
+}
+
+.gate-node--blocked .gate-node-icon {
+  background: rgba(255, 71, 87, 0.12);
+  border-color: var(--red);
+  color: var(--red);
+  box-shadow: 0 0 12px rgba(255, 71, 87, 0.15);
+}
+
+.gate-node--active .gate-node-icon {
+  background: rgba(0, 180, 255, 0.12);
+  border-color: var(--blue);
+  color: var(--blue-strong);
+  box-shadow: 0 0 16px rgba(0, 180, 255, 0.2);
+}
+
+.gate-node-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue-strong);
+  animation: mc-pulse-anim 0.8s ease-in-out infinite;
+}
+
+.gate-arrow {
+  flex: 0.5;
+  height: 2px;
+  margin: 0 8px;
+  border-radius: 1px;
+  background: var(--border);
+  position: relative;
+  transition: all 400ms ease;
+}
+
+.gate-arrow--flowing {
+  background: linear-gradient(90deg, var(--green), var(--blue));
+}
+
+.gate-arrow--flowing::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  top: -4px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid var(--blue);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.gate-flow-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.gate-coverage-bar { display: grid; gap: 6px; }
+
+.gate-coverage-track {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: visible;
+}
+
+.gate-coverage-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gate-coverage-fill.passed {
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  box-shadow: 0 0 8px rgba(0, 214, 143, 0.3);
+}
+
+.gate-coverage-fill.blocked {
+  background: linear-gradient(90deg, var(--orange), var(--red));
+}
+
+.gate-coverage-threshold {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: var(--text-2);
+  border-radius: 1px;
+  opacity: 0.6;
+}
+
+.gate-coverage-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-2);
+}
+
+.gate-coverage-labels strong {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.gate-coverage-labels strong.passed { color: var(--green); }
+.gate-coverage-labels strong.blocked { color: var(--orange); }
+
+.gate-blockers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.gate-blockers span {
+  color: var(--text-3);
+  font-size: 10px;
+}
+
+.gate-blockers em {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 71, 87, 0.08);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  color: var(--red);
+  font-style: normal;
+  font-size: 10px;
+}
+
+.gate-passed-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(0, 214, 143, 0.06);
+  border: 1px solid rgba(0, 214, 143, 0.15);
+  color: var(--green);
+  font-size: 11px;
+}
+
+.gate-check-icon {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: #000;
+  font-weight: 800;
+  font-size: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HypothesisReshuffle · 疑因重排动画
+   ═══════════════════════════════════════════════════════════ */
+
+.hypothesis-reshuffle {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--glass-1);
+  border: 1px solid var(--border);
+}
+
+.reshuffle-header { padding: 0 4px; }
+
+.reshuffle-col-labels {
+  display: grid;
+  grid-template-columns: 60px 1fr 60px;
+  gap: 12px;
+}
+
+.reshuffle-col-labels span {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reshuffle-col-labels span:nth-child(2) { text-align: center; }
+.reshuffle-col-labels span:nth-child(3) { text-align: right; }
+
+.reshuffle-rows { display: grid; gap: 7px; }
+
+.reshuffle-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+}
+
+.reshuffle-rank-badge {
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--glass-2);
+  transition: all 400ms ease;
+}
+
+.reshuffle-rank-badge.before {
+  opacity: 0.5;
+}
+
+.reshuffle-rank-badge.after {
+  border-color: rgba(0, 180, 255, 0.25);
+  background: rgba(0, 180, 255, 0.06);
+}
+
+.reshuffle-rank-badge small {
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+.reshuffle-rank-badge strong {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--text-1);
+}
+
+.reshuffle-bar-container {
+  display: grid;
+  gap: 4px;
+}
+
+.reshuffle-bar-track {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.reshuffle-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 6px;
+}
+
+.reshuffle-bar.before {
+  background: rgba(139, 155, 180, 0.15);
+  border: 1px solid rgba(139, 155, 180, 0.2);
+}
+
+.reshuffle-bar.after.up {
+  background: linear-gradient(90deg, rgba(0, 214, 143, 0.2), rgba(0, 229, 204, 0.3));
+  border: 1px solid rgba(0, 214, 143, 0.4);
+  box-shadow: 0 0 8px rgba(0, 214, 143, 0.1);
+}
+
+.reshuffle-bar.after.down {
+  background: linear-gradient(90deg, rgba(255, 71, 87, 0.15), rgba(255, 165, 2, 0.2));
+  border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.reshuffle-bar.after.same {
+  background: rgba(0, 180, 255, 0.1);
+  border: 1px solid rgba(0, 180, 255, 0.2);
+}
+
+.reshuffle-row-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reshuffle-row-info strong {
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.reshuffle-delta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.delta-up { color: var(--green); }
+.delta-down { color: var(--red); }
+
+.reshuffle-delta em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reshuffle-delta em.delta-up { color: var(--green); }
+.reshuffle-delta em.delta-down { color: var(--red); }
+.reshuffle-delta em.delta-same { color: var(--text-3); }
+
+.reshuffle-delta small {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+.reshuffle-gate-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 60px;
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.reshuffle-gate-badge {
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.reshuffle-gate-badge.before {
+  background: rgba(255, 71, 87, 0.06);
+  border-color: rgba(255, 71, 87, 0.2);
+}
+
+.reshuffle-gate-badge.after {
+  background: rgba(0, 214, 143, 0.08);
+  border-color: rgba(0, 214, 143, 0.25);
+}
+
+.reshuffle-gate-badge span {
+  color: var(--text-3);
+  font-size: 9px;
+}
+
+.reshuffle-gate-badge.before strong { color: var(--red); }
+.reshuffle-gate-badge.after strong { color: var(--green); }
+
+.reshuffle-gate-badge strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reshuffle-gate-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+}
+
+.gate-arrow-line {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(90deg, var(--red), var(--green));
+  border-radius: 1px;
+}
+
+.gate-arrow-text {
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: rgba(0, 214, 143, 0.12);
+  border: 1px solid rgba(0, 214, 143, 0.3);
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+

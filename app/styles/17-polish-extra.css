@@ -1,0 +1,303 @@
+/* DriveLens 样式分片 17-polish-extra.css · 由 drivelens.css 汇总导入 */
+/* ═══════════════════════════════════════════════════════════
+   P0-c: 结论摘要卡 · Conclusion Summary Card
+   诊断面板顶部即时展示 Top1 疑因 + 分数 + 门禁 + 建议动作
+   ═══════════════════════════════════════════════════════════ */
+
+.conclusion-card {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid rgba(0, 180, 255, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(0, 180, 255, 0.06), rgba(0, 229, 204, 0.03));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: conclusion-in 380ms ease both;
+}
+
+@keyframes conclusion-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.conclusion-top {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.conclusion-score {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-width: 64px;
+  padding: 6px 4px;
+  border-radius: 13px;
+  border: 1px solid rgba(0, 180, 255, 0.25);
+  background: radial-gradient(circle, rgba(0, 180, 255, 0.1) 0 55%, transparent 56%);
+  text-align: center;
+}
+
+.conclusion-score .score-val {
+  font: 800 20px var(--font-mono);
+  color: var(--blue-strong);
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.conclusion-score .score-label {
+  color: var(--text-2);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.conclusion-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.conclusion-info .top-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.rank-badge {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(0, 180, 255, 0.12);
+  border: 1px solid rgba(0, 180, 255, 0.25);
+  color: var(--blue-strong);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.conclusion-info .hyp-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conclusion-info .hyp-group {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+/* 3-second answers row */
+.quick-answers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.qa-item {
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--glass-1);
+}
+
+.qa-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.qa-label .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.qa-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+}
+
+.qa-value.warning { color: var(--orange); }
+.qa-value.danger { color: var(--red); }
+.qa-value.success { color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════════
+   P0-d: 视觉化门禁进度条 · Gate Progress Indicator
+   ═══════════════════════════════════════════════════════════ */
+
+.gate-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  flex: 1 0 100%;
+}
+
+.gate-progress-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow: visible;
+}
+
+.gate-progress-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.gate-progress-fill.blocked {
+  background: linear-gradient(90deg, var(--orange), var(--red));
+  box-shadow: 0 0 8px rgba(255, 71, 87, 0.2);
+}
+
+.gate-progress-fill.passed {
+  background: linear-gradient(90deg, var(--green), var(--cyan));
+  box-shadow: 0 0 8px rgba(0, 214, 143, 0.25);
+}
+
+.gate-progress-threshold {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 16px;
+  background: var(--text-2);
+  border-radius: 1px;
+  opacity: 0.6;
+}
+
+.gate-progress-threshold::after {
+  content: "门槛";
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-3);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.gate-progress-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.gate-progress-labels strong {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.gate-progress-labels strong.blocked { color: var(--orange); }
+.gate-progress-labels strong.passed { color: var(--green); }
+
+/* ═══════════════════════════════════════════════════════════
+   P1-c: Stage 1 右栏预览面板 · Next Step Preview
+   ═══════════════════════════════════════════════════════════ */
+
+.stage-preview {
+  display: grid;
+  gap: 14px;
+  padding: 20px 16px;
+  flex: 1;
+  align-content: center;
+}
+
+.stage-preview-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  border-radius: 50%;
+  border: 2px dashed rgba(0, 180, 255, 0.25);
+  background: radial-gradient(circle, rgba(0, 180, 255, 0.05) 0 45%, transparent 46%);
+  color: var(--blue-strong);
+  font-size: 28px;
+  animation: ready-breathe 2.4s ease-in-out infinite;
+}
+
+.stage-preview-title {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.02em;
+}
+
+.stage-preview-desc {
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.stage-preview-steps {
+  display: grid;
+  gap: 8px;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+.stage-preview-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--glass-1);
+  transition: all 200ms ease;
+}
+
+.stage-preview-step:hover {
+  border-color: var(--border-hover);
+  background: var(--glass-2);
+}
+
+.stage-preview-step .step-num {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(0, 180, 255, 0.1);
+  border: 1px solid rgba(0, 180, 255, 0.2);
+  color: var(--blue-strong);
+  font: 800 12px var(--font-mono);
+  flex-shrink: 0;
+}
+
+.stage-preview-step .step-text {
+  display: grid;
+  gap: 1px;
+}
+
+.stage-preview-step .step-text strong {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.stage-preview-step .step-text small {
+  color: var(--text-2);
+  font-size: 11px;
+}

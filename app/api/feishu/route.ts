@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildIncidentReviewCard, sendFeishuInteractiveCard } from "../../lib/feishu-card";
-import { resolveIncident } from "../../lib/incident-resolver";
+import { resolveIncident, resolveIncidentStrict } from "../../lib/incident-resolver";
 import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 interface SyncRequest {
@@ -91,6 +91,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
+  const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
+    ? "scene_verified"
+    : "logs_only";
+  // 真实案例没有现场补证阶段；scene_verified 会静默降级为 logs_only，
+  // 这里显式拒绝，避免外部调用方误以为补证已生效。
+  const strict = resolveIncidentStrict(body.eventId, evidenceMode);
+  if (!strict.ok) {
+    return NextResponse.json(
+      {
+        error: strict.error,
+        notice: strict.error === "real_case_supplement_unsupported"
+          ? "真实案例没有现场补证阶段，scene_verified 请求被拒绝；请使用 logs_only。"
+          : undefined,
+      },
+      { status: strict.status },
+    );
+  }
+
   const resolved = buildFields(body);
   if (!resolved || !body.eventId) {
     return NextResponse.json({ error: "unknown_event" }, { status: 404 });
@@ -156,6 +174,7 @@ export async function POST(request: Request) {
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
       body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+      signal: AbortSignal.timeout(10_000),
     });
     const tokenPayload = (await tokenResponse.json()) as TenantTokenResponse;
     if (!tokenResponse.ok || tokenPayload.code !== 0 || !tokenPayload.tenant_access_token) {
@@ -171,6 +190,7 @@ export async function POST(request: Request) {
           "Content-Type": "application/json; charset=utf-8",
         },
         body: JSON.stringify({ fields }),
+        signal: AbortSignal.timeout(15_000),
       },
     );
     const recordPayload = (await recordResponse.json()) as CreateRecordResponse;

@@ -1,0 +1,104 @@
+/* DriveLens 样式分片 03-pitch-nav.css · 由 drivelens.css 汇总导入 */
+/* ═══ Pitch Strip ═══ */
+.pitch-strip {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 24px;
+  color: #fff;
+  background:
+    linear-gradient(100deg, rgba(0, 180, 255, 0.1), rgba(0, 229, 204, 0.05)),
+    var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.pitch-copy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.pitch-copy > span {
+  padding: 4px 8px;
+  border: 1px solid rgba(0, 180, 255, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--blue-strong);
+  font-size: 12px; font-weight: 800;
+  background: rgba(0, 180, 255, 0.05);
+}
+
+.pitch-copy > strong {
+  font-size: clamp(16px, 1.4vw, 20px);
+  letter-spacing: -0.035em;
+  color: var(--text-1);
+}
+
+.pitch-copy > small {
+  grid-column: 2;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+/* ═══ Demo Progress Nav ═══ */
+.demo-progress { display: flex; align-items: center; gap: 4px; }
+
+.demo-progress button {
+  min-width: 88px;
+  height: 40px;
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  background: var(--glass-1);
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px; font-weight: 600;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 200ms ease;
+}
+
+.demo-progress button:hover {
+  background: var(--glass-2);
+  border-color: var(--border-hover);
+}
+
+.demo-progress button::after {
+  content: "›";
+  margin-left: auto;
+  color: var(--text-3);
+}
+
+.demo-progress button:last-child::after { display: none; }
+
+.demo-progress button i {
+  width: 23px; height: 23px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-1);
+  font-size: 11px; font-style: normal;
+}
+
+.demo-progress button.active {
+  border-color: rgba(0, 180, 255, 0.5);
+  background: rgba(0, 180, 255, 0.08);
+  color: var(--blue-strong);
+  box-shadow: 0 0 20px rgba(0, 180, 255, 0.15);
+}
+
+.demo-progress button.active i,
+.demo-progress button.done i {
+  background: var(--blue);
+  box-shadow: 0 0 12px rgba(0, 180, 255, 0.4);
+}
+
+.compact-case-navigator {
+  display: none;
+}
+

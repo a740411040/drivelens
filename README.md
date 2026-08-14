@@ -77,15 +77,32 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 - 相似案例只用于缩小排查范围，不直接继承根因。
 - 抗扰动结果证明的是当前算法在已定义扰动下的稳定性，不代表真实道路安全认证。
 
+## 已知工程边界
+
+- **dev-only React 渲染警告**：`vinext dev` 开发模式下，react-dom 开发构建可能打印
+  `Detected multiple renderers concurrently rendering the same context provider`。
+  该检查只存在于 development 构建（生产 bundle 不含此代码路径）；本项目未定义任何应用级
+  Context，且 `react` / `react-dom` / `react-server-dom-webpack` 已统一到 19.2.6。
+  如复现，先确认 `npm ls react react-dom react-server-dom-webpack` 无重复副本，
+  再向 vinext / Next 上游反馈。
+- **真实案例 scene_verified 请求被显式拒绝**：真实案例没有现场补证阶段，向
+  `/api/diagnose`、`/api/feishu`、`/api/feishu-ai`、`/api/feishu/review` 传
+  `evidenceMode: "scene_verified"` 会返回 400 `real_case_supplement_unsupported`，
+  而不是静默降级为 `logs_only`。
+- **本地待同步队列可重试**：飞书未配置或远程失败时，载荷以原始请求体形式保存在
+  localStorage（`drivelens.feishu-outbox.v1` / `drivelens.feishu-ai-task-outbox.v1`），
+  可在同步抽屉与 AI 协同面板中查看、重试或丢弃；旧格式条目（无原始请求体）不能自动重发。
+
 ## 关键目录
 
-- app/DriveLensApp.tsx：异常回放、诊断、人工核验与飞书同步主界面。
-- app/components/EvidenceChallenge.tsx：补证改判与最小可证伪实验。
-- app/components/DiagnosticDepthPanel.tsx：抗扰动校验与故障指纹复用。
-- app/lib/demo-data.ts：三个异常事件与确定性时序样例。
-- app/lib/diagnostic-snapshot.ts：证据配置、逐项计分、统一快照与证据门禁。
-- app/lib/evidence-modes.ts：兼容导出层。
+- app/DriveLensApp.tsx：主界面编排（状态、事件处理与工作台布局）。
+- app/components/：TopBar、CaseNavigator、IncidentSidebar、DiagnosisPanel（右栏诊断面板及其子组件）、SyncDrawer（含本地待同步队列）、FeishuAICopilot 等。
+- app/lib/diagnostic-snapshot.ts：三个异常事件与证据配置（证据项、先验分、覆盖、证伪实验）。
+- app/lib/evidence-scoring.ts：共享证据计分与证据门禁实现（demo 与真实案例共用）。
 - app/lib/diagnostic-intelligence.ts：稳健性、故障指纹和相似案例算法。
+- app/lib/real-diagnostic.ts：真实 RCA 案例 → 快照映射与边界模式。
+- app/lib/outbox.ts：本地待同步队列（读取、写入、重试、删除）。
+- app/styles/：按组件域拆分的样式分片，由 app/drivelens.css 汇总导入。
 - app/api/diagnose/route.ts：可信诊断接口。
 - app/api/feishu/route.ts：飞书记录、研发卡片与本地降级。
 - app/api/feishu/review/route.ts：带快照校验和证据门禁的多维表格核验适配接口；不是飞书卡片事件回调。

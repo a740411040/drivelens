@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveIncident } from "../../lib/incident-resolver";
+import { resolveIncidentStrict } from "../../lib/incident-resolver";
 import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
 
 interface DiagnoseRequest {
@@ -21,9 +21,11 @@ export async function POST(request: Request) {
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
     ? "scene_verified"
     : "logs_only";
-  const resolved = body.eventId ? resolveIncident(body.eventId, evidenceMode) : undefined;
-  if (!resolved) return NextResponse.json({ error: "unknown_event" }, { status: 404 });
-  const { incident, snapshot } = resolved;
+  const strict = resolveIncidentStrict(body.eventId, evidenceMode);
+  if (!strict.ok) {
+    return NextResponse.json({ error: strict.error }, { status: strict.status });
+  }
+  const { incident, snapshot } = strict.resolved;
 
   if (!snapshot.scoringAvailable) {
     return NextResponse.json({
@@ -71,6 +73,8 @@ export async function POST(request: Request) {
           { role: "user", content: prompt },
         ],
       }),
+      // 模型端点挂起时 15 秒内终止，避免请求无限占用服务端任务。
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) throw new Error(`model_http_${response.status}`);
     const payload = (await response.json()) as ChatCompletionResponse;

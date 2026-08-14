@@ -14,7 +14,7 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-// Packages Sites metadata and migrations after Vite finishes compiling.
+// Packages Sites metadata into the build output after Vite finishes compiling.
 export function sites(): Plugin {
   let root = process.cwd();
 
@@ -27,7 +27,6 @@ export function sites(): Plugin {
     async closeBundle() {
       const outputDirectory = resolve(root, "dist", ".openai");
       const hostingConfig = resolve(root, ".openai", "hosting.json");
-      const drizzleSource = resolve(root, "drizzle");
 
       // Best-effort cleanup: some sandboxes intercept deletions (e.g. routing
       // rm through a trash shim) and may abort them. A failed cleanup must not
@@ -41,11 +40,6 @@ export function sites(): Plugin {
 
       if (await exists(hostingConfig)) {
         await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));
-      }
-      if (await exists(drizzleSource)) {
-        await cp(drizzleSource, resolve(outputDirectory, "drizzle"), {
-          recursive: true,
-        });
       }
     },
   };

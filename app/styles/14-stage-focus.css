@@ -1,0 +1,98 @@
+/* DriveLens 样式分片 14-stage-focus.css · 由 drivelens.css 汇总导入 */
+/* ═══════════════════════════════════════════════════════════
+   P0-a + P2-a: Demo Stage Focus — 渐进式披露
+   非当前步骤的区域降低不透明度并收起交互
+   ═══════════════════════════════════════════════════════════ */
+
+/* 默认所有有 data-stages 的区块平滑过渡 */
+[data-stages] {
+  transition: opacity 350ms ease, max-height 350ms ease, margin 350ms ease;
+}
+
+/* Stage 1: 现场还原 — 只聚焦图表，疑因面板和补证区收起 */
+.app-shell.demo-stage-1 [data-stages]:not([data-stages~="1"]) {
+  display: none;
+}
+
+/* Stage 2: 疑因竞争 — 聚焦右栏诊断，补证区收起 */
+.app-shell.demo-stage-2 [data-stages]:not([data-stages~="2"]) {
+  display: none;
+}
+
+/* Stage 3: 补证改判 — 聚焦补证区，时间线收起 */
+.app-shell.demo-stage-3 [data-stages]:not([data-stages~="3"]) {
+  display: none;
+}
+
+/* Stage 4: 飞书AI协同 — 全局轻微淡化 */
+.app-shell.demo-stage-4 [data-stages] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 当前步骤的区块全亮 */
+.app-shell.demo-stage-1 [data-stages~="1"],
+.app-shell.demo-stage-2 [data-stages~="2"],
+.app-shell.demo-stage-3 [data-stages~="3"] {
+  opacity: 1;
+  pointer-events: auto;
+  filter: none;
+}
+
+/* ═══ P0-b: CTA 脉冲引导动画 ═══ */
+.primary-button.cta-pulse {
+  animation: cta-pulse 1.8s ease-in-out infinite;
+  position: relative;
+}
+
+.primary-button.cta-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--blue-strong);
+  animation: cta-ring 1.8s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 8px 24px rgba(0, 180, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1); }
+  50% { box-shadow: 0 8px 36px rgba(0, 180, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15); }
+}
+
+@keyframes cta-ring {
+  0% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+/* ═══ P1-a: 人工核验操作区固定底部 ═══ */
+.diagnosis-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.review-box {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: auto;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(13, 20, 36, 0.97), rgba(20, 28, 44, 0.95));
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* 右栏可滚动内容区 */
+.diagnosis-panel > .diagnosis-head,
+.diagnosis-panel > .trust-notice,
+.diagnosis-panel > .hypothesis-list,
+.diagnosis-panel > .hypothesis-detail,
+.diagnosis-panel > .gate-panel,
+.diagnosis-panel > .analysis-progress,
+.diagnosis-panel > .ready-prompt {
+  flex-shrink: 0;
+}
+
