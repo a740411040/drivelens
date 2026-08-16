@@ -138,7 +138,7 @@ DriveLens 只有在现场证据、证据覆盖率、Top1 强度、领先幅度�
 
 ### 5.1 本地体验
 
-随附源码包提供 Windows 一键启动脚本与生产构建验收脚本，本地运行分三步：
+随附源码包提供 Windows 一键启动脚本与生产构建验收脚本，下载地址：https://github.com/a740411040/drivelens/releases/download/v1.0.0/DriveLens-v1.0.0.zip（附 SHA-256 校验文件，Release 页：https://github.com/a740411040/drivelens/releases/tag/v1.0.0 ）。本地运行分三步：
 
 1. 安装 Node.js 22.13.0 或更高版本；
 2. 在解压后的项目目录执行 `npm ci` 安装依赖；
