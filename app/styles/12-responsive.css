@@ -2,7 +2,7 @@
 /* ═══ Responsive ═══ */
 @media (max-width: 1480px) {
   .workspace {
-    grid-template-columns: minmax(650px, 1fr) 390px;
+    grid-template-columns: minmax(0, 1fr) 390px;
     height: calc(100vh - 232px);
   }
 
@@ -63,7 +63,7 @@
   }
 
   .pitch-strip {
-    grid-template-columns: minmax(380px, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .demo-progress button { min-width: 82px; }
@@ -74,7 +74,7 @@
 }
 
 @media (max-width: 1320px) {
-  .workspace { grid-template-columns: minmax(560px, 1fr) 352px; }
+  .workspace { grid-template-columns: minmax(0, 1fr) 352px; }
   .boundary-copy { display: none; }
   .evidence-workbench { padding: 16px; }
   .diagnosis-panel { padding: 16px 13px; }
@@ -105,6 +105,7 @@
   .diagnosis-panel {
     overflow: visible;
     border-top: 1px solid var(--border);
+    scroll-margin-top: 12px;
   }
 
   .evidence-workbench {
@@ -337,5 +338,4 @@
   color: rgba(139, 155, 180, 0.5);
   font-size: 12px;
 }
-
 

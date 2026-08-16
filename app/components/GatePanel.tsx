@@ -50,6 +50,7 @@ export default function GatePanel({
               {snapshot.evidence.completeness}% / 门槛 {snapshot.evidence.thresholdPercent}%
             </strong>
           </div>
+          <p className="gate-method-note">覆盖率按“已取得证据槽位 / 本场景必需槽位”计算；门槛来自事件配置。</p>
         </div>
       )}
     </div>

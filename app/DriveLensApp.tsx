@@ -33,13 +33,16 @@ import {
   type RealCaseDiagnosticSnapshot,
 } from "./lib/real-diagnostic";
 import {
+  FEISHU_AI_TASK_OUTBOX_KEY,
   FEISHU_OUTBOX_KEY,
+  buildCardOnlyRetryRequest,
   isReplayableOutboxEntry,
   readOutbox,
   removeOutboxEntry,
   upsertOutboxEntry,
   type FeishuOutboxEntry,
 } from "./lib/outbox";
+import { buildReplayUrl } from "./lib/replay-state";
 import {
   diagnosisSteps,
   supplementSteps,
@@ -55,28 +58,56 @@ import {
 } from "./lib/ui-types";
 import { cx, riskTone, statusFor } from "./lib/ui-utils";
 
-export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?: string }) {
+export default function DriveLensApp({
+  initialIncidentId,
+  initialDataSource,
+  initialEvidenceMode,
+}: {
+  initialIncidentId?: string;
+  initialDataSource?: DataSource;
+  initialEvidenceMode?: EvidenceMode;
+}) {
+  const matchingRealCase = initialIncidentId ? getRealCaseById(initialIncidentId) : undefined;
+  const resolvedInitialDataSource: DataSource = initialDataSource === "real" || (!initialDataSource && matchingRealCase)
+    ? "real"
+    : "demo";
+  const initialRealCase = resolvedInitialDataSource === "real"
+    ? matchingRealCase ?? loadRealCases()[0]
+    : undefined;
   const initialIncident = incidents.find((item) => item.id === initialIncidentId) ?? incidents[0];
-  const initialSnapshot = createDiagnosticSnapshot(initialIncident, "logs_only");
+  // 真实案例没有现场补证数据，深链即使传入 scene_verified 也必须回落到 logs_only。
+  const resolvedInitialEvidenceMode: EvidenceMode = resolvedInitialDataSource === "real"
+    ? "logs_only"
+    : initialEvidenceMode === "scene_verified" ? "scene_verified" : "logs_only";
+  const initialSnapshot = initialRealCase
+    ? createRealCaseSnapshot(initialRealCase, "logs_only")
+    : createDiagnosticSnapshot(initialIncident, resolvedInitialEvidenceMode);
   const [selectedId, setSelectedId] = useState(initialIncident.id);
   const [activeSignals, setActiveSignals] = useState<SignalKey[]>(["speed", "acceleration", "distance", "trackingConfidence"]);
   const [analysisState, setAnalysisState] = useState<"ready" | "running" | "complete">("ready");
   const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [selectedHypothesisId, setSelectedHypothesisId] = useState(initialSnapshot.hypotheses[0].id);
+  const [selectedHypothesisId, setSelectedHypothesisId] = useState(
+    initialSnapshot.hypotheses[0]?.id ?? "no-supported-direction",
+  );
   const [decision, setDecision] = useState<ReviewDecision>("needs_evidence");
   const [note, setNote] = useState("");
   const [reviews, setReviews] = useState<Record<string, ReviewRecord>>({});
-  const [evidenceModes, setEvidenceModes] = useState<Record<string, EvidenceMode>>({});
+  const [evidenceModes, setEvidenceModes] = useState<Record<string, EvidenceMode>>(() => ({
+    [initialSnapshot.eventId]: resolvedInitialEvidenceMode,
+  }));
   const [analysisPurpose, setAnalysisPurpose] = useState<AnalysisPurpose>("diagnosis");
-  const [agentMode, setAgentMode] = useState<AgentMode>("证据模式");
+  const [agentMode, setAgentMode] = useState<AgentMode>(
+    resolvedInitialEvidenceMode === "scene_verified" ? "补证改判" : "证据模式",
+  );
   const [syncOpen, setSyncOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [demoStage, setDemoStage] = useState<DemoStage>(1);
-  const [dataSource, setDataSource] = useState<DataSource>("demo");
-  const [selectedRealCaseId, setSelectedRealCaseId] = useState<string>("RCA-EXT-001");
+  const [dataSource, setDataSource] = useState<DataSource>(resolvedInitialDataSource);
+  const [selectedRealCaseId, setSelectedRealCaseId] = useState<string>(initialRealCase?.case_id ?? "RCA-EXT-001");
   const [autoDemo, setAutoDemo] = useState(false);
+  const [resetGeneration, setResetGeneration] = useState(0);
   const autoDemoTimers = useRef<number[]>([]);
   // 本地待同步队列：读取、展示与重试（见 lib/outbox.ts）。
   // 惰性初始化读取 localStorage，避免在 effect 中同步 setState。
@@ -135,6 +166,12 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   const review = storedReview?.snapshotId === snapshot.snapshotId ? storedReview : undefined;
   const currentStatus = statusFor(incident, review);
   const isRealCase = dataSource === "real" && currentRealCase !== undefined;
+  const stageAvailability: Record<DemoStage, boolean> = {
+    1: true,
+    2: demoStage >= 2 || analysisState === "complete",
+    3: !isRealCase && (demoStage >= 2 || analysisState === "complete") && snapshot.capabilities.supplementalEvidence,
+    4: demoStage >= 2 || analysisState === "complete",
+  };
   const realCaseSnapshot = snapshot.source === "real_case_derived"
     ? snapshot as RealCaseDiagnosticSnapshot
     : undefined;
@@ -207,6 +244,18 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
     }, 360);
     return () => window.clearInterval(timer);
   }, [activeAnalysisSteps.length, analysisPurpose, analysisState, incident, dataSource, currentRealCase]);
+
+  useEffect(() => {
+    if (analysisState !== "complete") return;
+    if (!window.matchMedia("(max-width: 1180px)").matches) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById("diagnosis-panel")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [analysisState, snapshot.snapshotId]);
 
   useEffect(() => {
     if (!toast) return;
@@ -351,7 +400,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
       evidenceMode: snapshot.mode,
       snapshotId: snapshot.snapshotId,
       selectedHypothesisId: selectedHypothesis.id,
-      replayUrl: window.location.href,
+      replayUrl: buildReplayUrl(window.location.href, incident.id, dataSource, snapshot.mode),
       review: {
         status: decision === "confirmed" ? "已核验" : decision === "rejected" ? "重新研判" : "补证中",
         rootCause: decision === "confirmed" ? selectedHypothesis.title : "",
@@ -374,8 +423,16 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
           request,
           queuedAt: new Date().toISOString(),
         }));
+      } else if (payload.mode === "bitable-only") {
+        const cardOnlyRequest = buildCardOnlyRetryRequest(request, payload.recordId);
+        if (!cardOnlyRequest) throw new Error("missing_bitable_record_id");
+        setOutboxEntries(upsertOutboxEntry(FEISHU_OUTBOX_KEY, {
+          eventId: incident.id,
+          request: cardOnlyRequest,
+          queuedAt: new Date().toISOString(),
+        }));
       } else {
-        // 远程写入成功（含卡片），本地条目不再需要。
+        // 事件表和群卡片都已送达，本地条目不再需要。
         setOutboxEntries(removeOutboxEntry(FEISHU_OUTBOX_KEY, incident.id));
       }
       setSyncOpen(false);
@@ -402,9 +459,19 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
       const payload = (await response.json()) as SyncResponse;
       if (payload.mode === "local-outbox") {
         setToast("重试仍处于本地模式：飞书凭证未配置或远程不可用，条目已保留");
+      } else if (payload.mode === "bitable-only") {
+        const cardOnlyRequest = buildCardOnlyRetryRequest(entry.request, payload.recordId);
+        if (cardOnlyRequest) {
+          setOutboxEntries(upsertOutboxEntry(FEISHU_OUTBOX_KEY, {
+            eventId,
+            request: cardOnlyRequest,
+            queuedAt: entry.queuedAt,
+          }));
+        }
+        setToast("事件表已存在，群卡片仍未送达；条目已保留，可继续重试");
       } else {
         setOutboxEntries(removeOutboxEntry(FEISHU_OUTBOX_KEY, eventId));
-        setToast(payload.mode === "feishu-card" ? `重试成功：事件表与群卡片已送达 · ${payload.recordId}` : `重试成功：已写入飞书事件表 · ${payload.recordId}`);
+        setToast(`重试成功：事件表与群卡片已送达 · ${payload.recordId}`);
       }
     } catch {
       setToast("重试失败，条目已保留在本地队列");
@@ -442,7 +509,8 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
   const resetDemo = () => {
     cancelInflightDiagnosis();
     window.localStorage.removeItem("drivelens.reviews.v1");
-    window.localStorage.removeItem("drivelens.feishu-outbox.v1");
+    window.localStorage.removeItem(FEISHU_OUTBOX_KEY);
+    window.localStorage.removeItem(FEISHU_AI_TASK_OUTBOX_KEY);
     setReviews({});
     setEvidenceModes({});
     setOutboxEntries([]);
@@ -458,6 +526,7 @@ export default function DriveLensApp({ initialIncidentId }: { initialIncidentId?
     setAnalysisProgress(0);
     setSyncOpen(false);
     setAiOpen(false);
+    setResetGeneration((current) => current + 1);
     setDemoStage(1);
     setToast("演示状态已重置");
   };
@@ -524,6 +593,10 @@ ${scoring ? `<p class="note">匹配度 = 先验分 + 支持分 − 反证分，�
   };
 
   const jumpToStage = (stage: DemoStage) => {
+    if (!stageAvailability[stage]) {
+      setToast("请先完成当前阶段，系统会保留必要的前置证据");
+      return;
+    }
     setDemoStage(stage);
     if (stage === 4) {
       setAiOpen(true);
@@ -582,6 +655,7 @@ ${scoring ? `<p class="note">匹配度 = 先验分 + 支持分 − 反证分，�
         onReset={resetDemo}
         onOpenAI={() => jumpToStage(4)}
         onJumpStage={jumpToStage}
+        stageAvailability={stageAvailability}
       />
 
       <CaseNavigator
@@ -739,7 +813,7 @@ ${scoring ? `<p class="note">匹配度 = 先验分 + 支持分 − 反证分，�
       </div>
 
       <FeishuAICopilot
-        key={snapshot.snapshotId}
+        key={`${snapshot.snapshotId}:${resetGeneration}`}
         open={aiOpen}
         incident={incident}
         snapshot={snapshot}

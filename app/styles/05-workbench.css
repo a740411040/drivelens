@@ -101,7 +101,7 @@
 
 .real-case-boundary {
   display: grid;
-  grid-template-columns: minmax(260px, 1.15fr) minmax(420px, 1.85fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.85fr);
   gap: 16px;
   margin-bottom: 12px;
   padding: 15px 16px;
@@ -168,7 +168,11 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+  cursor: pointer;
+  list-style: none;
 }
+
+.unlock-preview-head::-webkit-details-marker { display: none; }
 
 .unlock-preview-head h2 {
   margin: 0;
@@ -183,8 +187,12 @@
   background: rgba(255, 165, 2, 0.08);
   border: 1px solid rgba(255, 165, 2, 0.22);
   color: var(--orange);
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
+}
+
+.unlock-preview:not([open]) .unlock-preview-head {
+  align-items: center;
 }
 
 .unlock-chain {
@@ -250,13 +258,13 @@
 
 .unlock-step-copy small {
   color: var(--text-2);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.45;
 }
 
 .unlock-requires {
   color: var(--text-3);
-  font-size: 9px;
+  font-size: 10.5px;
   line-height: 1.4;
 }
 
@@ -268,7 +276,7 @@
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-3);
-  font-size: 9px;
+  font-size: 10.5px;
   font-weight: 700;
 }
 
@@ -296,4 +304,3 @@
 @media (max-width: 1180px) {
   .unlock-chain { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-

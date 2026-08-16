@@ -63,8 +63,8 @@ export default function EvidenceGateFlow({ snapshot }: EvidenceGateFlowProps) {
             style={{ transitionDelay: `${index * 100}ms` }}
           >
             <div className="gate-node-icon">
-              {stage.status === "passed" && <span>L</span>}
-              {stage.status === "blocked" && <span>X</span>}
+              {stage.status === "passed" && <span aria-label="已完成">✓</span>}
+              {stage.status === "blocked" && <span aria-label="已阻断">×</span>}
               {stage.status === "active" && <span className="gate-node-pulse" />}
               {stage.status === "pending" && <span>{index + 1}</span>}
             </div>
@@ -96,6 +96,9 @@ export default function EvidenceGateFlow({ snapshot }: EvidenceGateFlowProps) {
             <span>{isRealCaseDerived ? "原始证据未接入" : `门槛 ${snapshot.evidence.thresholdPercent}%`}</span>
             <strong className={canConfirm ? "passed" : "blocked"}>{isRealCaseDerived ? "不可确认" : `${snapshot.evidence.completeness}%`}</strong>
           </div>
+          <p className="gate-method-note">
+            口径：覆盖率 = 已取得证据槽位 / 本场景必需槽位；门槛来自当前事件的证据门禁配置，不代表模型置信度。
+          </p>
         </div>
 
         {!canConfirm && blockers.length > 0 && (
@@ -109,7 +112,7 @@ export default function EvidenceGateFlow({ snapshot }: EvidenceGateFlowProps) {
 
         {canConfirm && (
           <div className="gate-passed-msg">
-            <span className="gate-check-icon">L</span>
+            <span className="gate-check-icon" aria-label="已通过">✓</span>
             <span>证据覆盖已超门禁阈值，可进入人工确认环节</span>
           </div>
         )}

@@ -30,13 +30,20 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 
 ## 快速启动
 
-项目已包含依赖，在 PowerShell 中运行：
+交付包不包含 `node_modules`、凭证或开发缓存。请先安装 Node.js 22.13.0 或更高版本，然后在解压后的项目目录执行一次：
 
-    powershell -ExecutionPolicy Bypass -File .\启动演示.ps1
+    npm ci
+
+安装完成后，双击 `【双击这里】启动DriveLens演示.cmd`。启动器会使用固定端口 3001、检查生产构建，并在需要时完成首次构建；也可在 PowerShell 中运行：
+
+    npm run build
+    npm start
 
 默认访问地址：
 
     http://localhost:3001/
+
+构建结束后会实际启动临时生产服务并逐一检查首页引用的 JS/CSS 静态资源，避免出现“首页返回 200、但界面资源 404”的伪通过。
 
 完整验证：
 
@@ -44,6 +51,17 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
     npm run lint
     npx tsc -p tsconfig.app.json --noEmit
     npm run assessment:check
+
+生成企业交付包：
+
+    npm run release:package
+
+若 Windows 受限环境禁止启动 Wrangler/esbuild 子进程，可使用已验证的本地生产构建路径：
+
+    npm run release:package:native
+
+只有在最新生产构建、静态资源验收和白名单核验全部通过后，脚本才会生成 `release/DriveLens-v1.0.0.zip` 及压缩包 SHA-256；包内仅包含白名单源码、生产构建、文档、评测夹具、`RELEASE_MANIFEST.json` 和逐文件 `SHA256SUMS.txt`，不会带入 `.git`、`node_modules`、`.next` 或本机缓存。
+复赛成片位于 `video/DriveLens_复赛Demo.mp4`，已完成 240 秒全片解码、音视频规格、黑场/静音和 8 场景代表帧验收；发布脚本会将其纳入交付包。HyperFrames 原生动态检查仍受本机浏览器子进程权限限制，验证日志保留了该环境边界与最终采用的确定性逐帧渲染路径。
 
 ## 推荐演示顺序
 
@@ -63,6 +81,7 @@ DriveLens 聚焦校园无人车突然刹停、异常等待和异常绕行等典�
 复制 .env.example 为 .env.local。所有配置均为可选，不填写也能完成本地演示。
 
 - LLM_API_BASE、LLM_API_KEY、LLM_MODEL：OpenAI-compatible 模型接口，仅用于解释锁定后的证据排序；不可用时证据计分与完整演示不受影响。
+- NEXT_PUBLIC_SITE_URL：部署后的公开地址；离线演示保持 `http://localhost:3001`。
 - FEISHU_APP_ID、FEISHU_APP_SECRET：企业自建应用凭证，只在服务端读取。
 - FEISHU_BITABLE_APP_TOKEN、FEISHU_BITABLE_TABLE_ID：异常诊断多维表格。
 - FEISHU_CHAT_ID：可选；配置后创建记录成功会继续发送飞书研发核验卡。

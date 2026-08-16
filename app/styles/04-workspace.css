@@ -2,10 +2,13 @@
 /* ═══ Workspace ═══ */
 .workspace {
   display: grid;
-  grid-template-columns: 220px minmax(650px, 1fr) 410px;
+  grid-template-columns: 220px minmax(0, 1fr) 410px;
   height: calc(100vh - 130px);
   min-height: 650px;
 }
+
+/* 网格子项必须允许收缩到轨道宽度以内，否则内容最小宽度会顶开轨道造成页面级横向滚动。 */
+.workspace > * { min-width: 0; }
 
 .incident-sidebar, .diagnosis-panel {
   overflow-y: auto;
@@ -89,6 +92,9 @@
 }
 
 .incident-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: space-between;
   margin-bottom: 8px;
 }
@@ -182,6 +188,7 @@
   color: var(--text-2);
   text-align: right;
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
 .incident-card.real-case-card {

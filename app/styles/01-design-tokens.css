@@ -5,6 +5,9 @@
    ═══════════════════════════════════════════════════════════ */
 
 :root {
+  /* 深色主题：让滚动条等浏览器原生控件默认采用深色渲染 */
+  color-scheme: dark;
+
   /* ── 深空背景层 ── */
   --bg-void: #04060c;
   --bg-deep: #080b14;
@@ -86,4 +89,21 @@ html, body {
 
 button, textarea { font: inherit; }
 button { color: inherit; }
+
+/* ── 深色滚动条：与毛玻璃主题一致的细滚动条 ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(157, 176, 204, 0.28) transparent;
+}
+
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(157, 176, 204, 0.28);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 180, 255, 0.45);
+}
+*::-webkit-scrollbar-corner { background: transparent; }
 

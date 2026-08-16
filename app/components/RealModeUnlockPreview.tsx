@@ -55,14 +55,14 @@ const unlockChain: UnlockStep[] = [
 export default function RealModeUnlockPreview() {
   const done = unlockChain.filter((step) => step.state === "已接入").length;
   return (
-    <section className="unlock-preview" aria-label="真实数据全链路解锁预览">
-      <div className="unlock-preview-head">
+    <details className="unlock-preview" aria-label="真实数据全链路解锁预览">
+      <summary className="unlock-preview-head">
         <div>
-          <span className="eyebrow">全链路预览 · 当前 {done}/{unlockChain.length} 已接入</span>
-          <h2>接入真实数据后，这条诊断链路将完整运行</h2>
+          <span className="eyebrow">真实案例附录 · 当前仅接入派生元数据</span>
+          <h2>查看企业接入后可解锁的诊断链路</h2>
         </div>
-        <span className="unlock-preview-note">以下为能力路线图，不代表已完成</span>
-      </div>
+        <span className="unlock-preview-note">展开查看 {done}/{unlockChain.length} 个接入状态</span>
+      </summary>
       <div className="unlock-chain">
         {unlockChain.map((step, index) => (
           <article key={step.key} className={`unlock-step state-${step.state === "已接入" ? "done" : step.state === "待配置" ? "pending" : "locked"}`}>
@@ -77,6 +77,6 @@ export default function RealModeUnlockPreview() {
         ))}
       </div>
       <p className="unlock-boundary">在原始时序与独立金标到达前，系统仅组织派生事实与补证方向，不评分、不排序、不确认根因。</p>
-    </section>
+    </details>
   );
 }

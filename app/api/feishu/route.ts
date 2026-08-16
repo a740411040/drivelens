@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { parseRequiredSnapshotId } from "../../lib/api-contract";
+import { guardRateLimit, guardWriteRequest } from "../../lib/api-write-guard";
 import { buildIncidentReviewCard, sendFeishuInteractiveCard } from "../../lib/feishu-card";
 import { resolveIncident, resolveIncidentStrict } from "../../lib/incident-resolver";
 import type { EvidenceMode } from "../../lib/diagnostic-snapshot";
@@ -7,6 +9,8 @@ interface SyncRequest {
   eventId?: string;
   evidenceMode?: EvidenceMode;
   snapshotId?: string;
+  syncTarget?: "full" | "card_only";
+  existingRecordId?: string;
   selectedHypothesisId?: string;
   review?: {
     status?: string;
@@ -80,6 +84,11 @@ function buildFields(body: SyncRequest) {
 }
 
 export async function POST(request: Request) {
+  const rateLimit = guardRateLimit(request, "feishu-sync", 12);
+  if (rateLimit) return rateLimit;
+  const writeGuard = guardWriteRequest(request);
+  if (writeGuard) return writeGuard;
+
   let body: SyncRequest;
   try {
     const parsed = (await request.json()) as unknown;
@@ -89,6 +98,18 @@ export async function POST(request: Request) {
     body = parsed as SyncRequest;
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  const requestedSnapshotId = parseRequiredSnapshotId(body.snapshotId);
+  if (!requestedSnapshotId) {
+    return NextResponse.json({ error: "snapshotId_required" }, { status: 400 });
+  }
+  const syncTarget = body.syncTarget === "card_only" ? "card_only" : "full";
+  const existingRecordId = typeof body.existingRecordId === "string"
+    ? body.existingRecordId.trim().slice(0, 120)
+    : "";
+  if (syncTarget === "card_only" && !existingRecordId) {
+    return NextResponse.json({ error: "existingRecordId_required" }, { status: 400 });
   }
 
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified"
@@ -114,7 +135,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "unknown_event" }, { status: 404 });
   }
   const { incident, snapshot, fields, source } = resolved;
-  if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
+  if (body.snapshotId !== snapshot.snapshotId || requestedSnapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
       { status: 409 },
@@ -130,7 +151,7 @@ export async function POST(request: Request) {
   const localCardPreview = buildIncidentReviewCard(
     incident,
     snapshot,
-    { replayUrl: body.replayUrl },
+    { recordId: existingRecordId || undefined, replayUrl: body.replayUrl },
   );
   if (!localCardPreview) return NextResponse.json({ error: "card_preview_unavailable" }, { status: 500 });
 
@@ -141,15 +162,31 @@ export async function POST(request: Request) {
   const chatId = process.env.FEISHU_CHAT_ID;
   const syncEnabled = process.env.FEISHU_SYNC_ENABLED === "true";
 
-  if (!syncEnabled || !appId || !appSecret || !appToken || !tableId) {
-    const missingConfig = [
-      !syncEnabled ? "FEISHU_SYNC_ENABLED=true" : null,
-      !appId ? "FEISHU_APP_ID" : null,
-      !appSecret ? "FEISHU_APP_SECRET" : null,
-      !appToken ? "FEISHU_BITABLE_APP_TOKEN" : null,
-      !tableId ? "FEISHU_BITABLE_TABLE_ID" : null,
-    ].filter((item): item is string => Boolean(item));
+  const missingConfig = [
+    !syncEnabled ? "FEISHU_SYNC_ENABLED=true" : null,
+    !appId ? "FEISHU_APP_ID" : null,
+    !appSecret ? "FEISHU_APP_SECRET" : null,
+    syncTarget === "full" && !appToken ? "FEISHU_BITABLE_APP_TOKEN" : null,
+    syncTarget === "full" && !tableId ? "FEISHU_BITABLE_TABLE_ID" : null,
+    syncTarget === "card_only" && !chatId ? "FEISHU_CHAT_ID" : null,
+  ].filter((item): item is string => Boolean(item));
 
+  if (missingConfig.length > 0) {
+    if (syncTarget === "card_only") {
+      return NextResponse.json(
+        {
+          mode: "bitable-only",
+          remote: { bitable: true, card: false },
+          source,
+          recordId: existingRecordId,
+          fields,
+          cardPreview: localCardPreview,
+          missingConfig,
+          notice: "多维表格记录已存在；卡片发送配置不完整，重试请求已保留且不会重复创建记录。",
+        },
+        { status: 202 },
+      );
+    }
     return NextResponse.json(
       {
         mode: "local-outbox",
@@ -181,22 +218,25 @@ export async function POST(request: Request) {
       throw new Error(`token_${tokenPayload.code}_${tokenPayload.msg}`);
     }
 
-    const recordResponse = await fetch(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${encodeURIComponent(appToken)}/tables/${encodeURIComponent(tableId)}/records`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${tokenPayload.tenant_access_token}`,
-          "Content-Type": "application/json; charset=utf-8",
+    let recordId = existingRecordId;
+    if (syncTarget === "full") {
+      const recordResponse = await fetch(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${encodeURIComponent(appToken!)}/tables/${encodeURIComponent(tableId!)}/records`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${tokenPayload.tenant_access_token}`,
+            "Content-Type": "application/json; charset=utf-8",
+          },
+          body: JSON.stringify({ fields }),
+          signal: AbortSignal.timeout(15_000),
         },
-        body: JSON.stringify({ fields }),
-        signal: AbortSignal.timeout(15_000),
-      },
-    );
-    const recordPayload = (await recordResponse.json()) as CreateRecordResponse;
-    const recordId = recordPayload.data?.record?.record_id;
-    if (!recordResponse.ok || recordPayload.code !== 0 || !recordId) {
-      throw new Error(`record_${recordPayload.code}_${recordPayload.msg}`);
+      );
+      const recordPayload = (await recordResponse.json()) as CreateRecordResponse;
+      recordId = recordPayload.data?.record?.record_id ?? "";
+      if (!recordResponse.ok || recordPayload.code !== 0 || !recordId) {
+        throw new Error(`record_${recordPayload.code}_${recordPayload.msg}`);
+      }
     }
 
     const cardPreview = buildIncidentReviewCard(
@@ -261,6 +301,21 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const failure = error instanceof Error ? error.message.slice(0, 240) : "unknown_sync_error";
+    if (syncTarget === "card_only") {
+      return NextResponse.json(
+        {
+          mode: "bitable-only",
+          remote: { bitable: true, card: false },
+          source,
+          recordId: existingRecordId,
+          fields,
+          cardPreview: localCardPreview,
+          failure,
+          notice: "多维表格记录已存在；卡片重试失败，条目已保留且不会重复创建记录。",
+        },
+        { status: 202 },
+      );
+    }
     return NextResponse.json(
       {
         mode: "local-outbox",

@@ -12,6 +12,7 @@ export default function TopBar({
   onReset,
   onOpenAI,
   onJumpStage,
+  stageAvailability,
 }: {
   isRealCase: boolean;
   autoDemo: boolean;
@@ -20,6 +21,7 @@ export default function TopBar({
   onReset: () => void;
   onOpenAI: () => void;
   onJumpStage: (stage: DemoStage) => void;
+  stageAvailability: Record<DemoStage, boolean>;
 }) {
   return (
     <>
@@ -46,7 +48,7 @@ export default function TopBar({
       <section className="pitch-strip" aria-label="比赛讲解导览">
         <div className="pitch-copy">
           <span>一句模糊异常</span>
-          <strong>用 2 分钟演示一条可回放、可反驳、可协同的工程证据链</strong>
+          <strong>用一条主线看懂可回放、可反驳、可协同的工程证据链</strong>
           <small>
             {isRealCase
               ? "真实 RCA 派生案例仅验证证据边界与协同协议；原始时序未接入，系统不评分、不归因。"
@@ -60,6 +62,9 @@ export default function TopBar({
               type="button"
               className={cx(demoStage === stage.id && "active", demoStage > stage.id && "done")}
               onClick={() => onJumpStage(stage.id)}
+              disabled={!stageAvailability[stage.id]}
+              aria-disabled={!stageAvailability[stage.id]}
+              title={!stageAvailability[stage.id] ? "请先完成前一步，系统会自动带你到对应区域" : undefined}
             >
               <i>{demoStage > stage.id ? "✓" : stage.id}</i>
               <span>{stage.label}</span>

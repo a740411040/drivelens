@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { parseRequiredSnapshotId } from "../../../lib/api-contract";
+import { guardRateLimit, guardWriteRequest } from "../../../lib/api-write-guard";
 import { resolveIncidentStrict } from "../../../lib/incident-resolver";
 import type { EvidenceMode } from "../../../lib/diagnostic-snapshot";
 
@@ -26,7 +28,7 @@ interface ReviewRequest {
 interface ParsedReview {
   eventId: string;
   evidenceMode: EvidenceMode;
-  snapshotId?: string;
+  snapshotId: string;
   recordId?: string;
   action: ReviewAction;
   topCause?: string;
@@ -63,6 +65,8 @@ function parseReviewAction(value: unknown): ReviewAction | undefined {
 function parseReview(body: ReviewRequest): { review: ParsedReview } | { error: string } {
   const eventId = text(body.eventId, 80);
   if (!eventId) return { error: "eventId_required" };
+  const snapshotId = parseRequiredSnapshotId(body.snapshotId);
+  if (!snapshotId) return { error: "snapshotId_required" };
   const action = parseReviewAction(body.action);
   if (!action) return { error: "invalid_action" };
 
@@ -76,7 +80,7 @@ function parseReview(body: ReviewRequest): { review: ParsedReview } | { error: s
     review: {
       eventId,
       evidenceMode: body.evidenceMode === "scene_verified" ? "scene_verified" : "logs_only",
-      snapshotId: text(body.snapshotId, 160),
+      snapshotId,
       recordId: text(body.recordId, 120),
       action,
       topCause,
@@ -123,6 +127,11 @@ function buildReviewFields(review: ParsedReview): {
 }
 
 export async function POST(request: Request) {
+  const rateLimit = guardRateLimit(request, "feishu-review", 20);
+  if (rateLimit) return rateLimit;
+  const writeGuard = guardWriteRequest(request);
+  if (writeGuard) return writeGuard;
+
   let rawBody: unknown;
   try {
     rawBody = await request.json();
@@ -139,7 +148,7 @@ export async function POST(request: Request) {
   const strict = resolveIncidentStrict(parsed.review.eventId, parsed.review.evidenceMode);
   if (!strict.ok) return NextResponse.json({ error: strict.error }, { status: strict.status });
   const { snapshot } = strict.resolved;
-  if (parsed.review.snapshotId && parsed.review.snapshotId !== snapshot.snapshotId) {
+  if (parsed.review.snapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
       { status: 409 },

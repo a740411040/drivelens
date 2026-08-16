@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { parseRequiredSnapshotId } from "../../lib/api-contract";
+import { guardRateLimit, guardWriteRequest } from "../../lib/api-write-guard";
 import {
   buildEvidenceTasks,
   buildFeishuAIAnswer,
@@ -106,20 +108,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
   }
 
+  const action: FeishuAIAction = body.action === "create_tasks" ? "create_tasks" : "chat";
+  const rateLimit = guardRateLimit(request, action === "create_tasks" ? "feishu-ai-tasks" : "feishu-ai-chat", action === "create_tasks" ? 12 : 60);
+  if (rateLimit) return rateLimit;
+  if (action === "create_tasks") {
+    const writeGuard = guardWriteRequest(request);
+    if (writeGuard) return writeGuard;
+  }
+  const requestedSnapshotId = parseRequiredSnapshotId(body.snapshotId);
+  if (!requestedSnapshotId) {
+    return NextResponse.json({ error: "snapshotId_required" }, { status: 400 });
+  }
+
   const evidenceMode: EvidenceMode = body.evidenceMode === "scene_verified" ? "scene_verified" : "logs_only";
   const strict = resolveIncidentStrict(body.eventId, evidenceMode);
   if (!strict.ok) {
     return NextResponse.json({ error: strict.error }, { status: strict.status });
   }
   const { incident, snapshot, source } = strict.resolved;
-  if (body.snapshotId && body.snapshotId !== snapshot.snapshotId) {
+  if (body.snapshotId !== snapshot.snapshotId || requestedSnapshotId !== snapshot.snapshotId) {
     return NextResponse.json(
       { error: "stale_snapshot", expectedSnapshotId: snapshot.snapshotId },
       { status: 409 },
     );
   }
 
-  const action: FeishuAIAction = body.action === "create_tasks" ? "create_tasks" : "chat";
   if (action === "chat") {
     return NextResponse.json({
       ...buildFeishuAIAnswer(incident, snapshot, body.message ?? "分析当前异常"),

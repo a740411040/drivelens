@@ -49,6 +49,9 @@ export interface FeishuSyncRequest {
   snapshotId: string;
   selectedHypothesisId: string;
   replayUrl: string;
+  /** full 创建事件记录并发送卡片；card_only 只重试已创建记录的群卡。 */
+  syncTarget?: "full" | "card_only";
+  existingRecordId?: string;
   review: {
     status: string;
     rootCause: string;

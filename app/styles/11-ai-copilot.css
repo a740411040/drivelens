@@ -147,7 +147,7 @@
 
 .ai-copilot-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
   height: calc(100% - 137px);
 }
 

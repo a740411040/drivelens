@@ -42,6 +42,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/release/
+
+# video assets stay local; demo is shared via Feishu Minutes link in the submission doc
+/video/
 
 # editor tool caches
 /.trae-html-share-packages/

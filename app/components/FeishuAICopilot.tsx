@@ -14,6 +14,7 @@ import {
   removeOutboxEntry,
   type FeishuAiTaskOutboxEntry,
 } from "../lib/outbox";
+import { buildReplayUrl } from "../lib/replay-state";
 
 interface FeishuAICopilotProps {
   open: boolean;
@@ -134,20 +135,32 @@ export default function FeishuAICopilot({
 
   const syncTasks = async (entry?: FeishuAiTaskOutboxEntry) => {
     if (syncingTasks) return;
+    const currentSource = snapshot.source === "real_case_derived" ? "real" : "demo";
+    const entrySource = entry?.source ?? (entry?.eventId.startsWith("RCA-EXT-") ? "real" : "demo");
     const payload = entry
       ? {
           action: "create_tasks" as const,
           eventId: entry.eventId,
           evidenceMode: entry.evidenceMode,
           snapshotId: entry.snapshotId,
-          replayUrl: window.location.href,
+          replayUrl: buildReplayUrl(
+            window.location.href,
+            entry.eventId,
+            entrySource,
+            entry.evidenceMode,
+          ),
         }
       : {
           action: "create_tasks" as const,
           eventId: incident.id,
           evidenceMode: snapshot.mode,
           snapshotId: snapshot.snapshotId,
-          replayUrl: window.location.href,
+          replayUrl: buildReplayUrl(
+            window.location.href,
+            incident.id,
+            currentSource,
+            snapshot.mode,
+          ),
         };
     setSyncingTasks(true);
     setTaskNotice(null);
@@ -162,6 +175,7 @@ export default function FeishuAICopilot({
       if (result.mode === "local-task-outbox") {
         const queued: FeishuAiTaskOutboxEntry = {
           eventId: payload.eventId,
+          source: entry ? entrySource : currentSource,
           snapshotId: payload.snapshotId,
           evidenceMode: payload.evidenceMode,
           tasks: result.tasks,

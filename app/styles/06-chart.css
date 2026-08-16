@@ -109,7 +109,7 @@
 /* ═══ Rule Row ═══ */
 .rule-row {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(280px, 1fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 12px;
   margin-top: 11px;
 }

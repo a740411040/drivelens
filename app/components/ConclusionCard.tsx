@@ -47,9 +47,7 @@ export default function ConclusionCard({
             建议动作
           </div>
           <div className="qa-value">
-            {selectedHypothesis.action.length > 12
-              ? `${selectedHypothesis.action.slice(0, 12)}…`
-              : selectedHypothesis.action}
+            {selectedHypothesis.action}
           </div>
         </div>
       </div>

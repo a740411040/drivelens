@@ -1,5 +1,5 @@
 import type { EvidenceTask } from "./feishu-ai";
-import type { FeishuSyncRequest } from "./ui-types";
+import type { DataSource, FeishuSyncRequest } from "./ui-types";
 
 /**
  * 本地待同步队列（outbox）。
@@ -22,6 +22,7 @@ export interface FeishuOutboxEntry {
 
 export interface FeishuAiTaskOutboxEntry {
   eventId: string;
+  source?: DataSource;
   snapshotId: string;
   evidenceMode: "logs_only" | "scene_verified";
   tasks: EvidenceTask[];
@@ -30,7 +31,22 @@ export interface FeishuAiTaskOutboxEntry {
 
 /** 兼容旧格式：仅含格式化字段的条目无法原样重放，只读展示并允许丢弃。 */
 export function isReplayableOutboxEntry(entry: FeishuOutboxEntry): boolean {
-  return Boolean(entry?.request?.eventId && entry?.request?.snapshotId);
+  if (!entry?.request?.eventId || !entry.request.snapshotId) return false;
+  return entry.request.syncTarget !== "card_only" || Boolean(entry.request.existingRecordId?.trim());
+}
+
+/** 把已写入多维表格但卡片未送达的请求转换为不会重复建表的重试请求。 */
+export function buildCardOnlyRetryRequest(
+  request: FeishuSyncRequest,
+  recordId: string | undefined,
+): FeishuSyncRequest | null {
+  const existingRecordId = recordId?.trim();
+  if (!existingRecordId) return null;
+  return {
+    ...request,
+    syncTarget: "card_only",
+    existingRecordId,
+  };
 }
 
 export function readOutbox<T>(key: string): T[] {

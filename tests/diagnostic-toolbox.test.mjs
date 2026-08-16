@@ -26,11 +26,13 @@ async function readAppSources() {
 }
 
 test("submission surface is aligned to the Youjia diagnostic challenge", async () => {
-  const [readme, page, layout, app] = await Promise.all([
+  const [readme, page, layout, app, releasePackage, voiceScript] = await Promise.all([
     read("README.md"),
     read("app/page.tsx"),
     read("app/layout.tsx"),
     readAppSources(),
+    read("scripts/create-release-package.mjs"),
+    read("video/drivelens-demo/scripts/generate-voice.ps1"),
   ]);
   const surface = [readme, page, layout, app].join("\n");
   assert.match(readme, /佑驾创新/);
@@ -38,6 +40,11 @@ test("submission surface is aligned to the Youjia diagnostic challenge", async (
   assert.match(surface, /可回放、可反驳、可协同/);
   assert.match(page, /DriveLensApp/);
   assert.doesNotMatch(surface, /全渠道|反馈中枢|用户回访|客服工单|闭环驾驶舱/);
+  assert.doesNotMatch(releasePackage, /^\s*"video",\s*$/m);
+  assert.match(releasePackage, /video\/drivelens-demo\/\.media/);
+  assert.match(releasePackage, /video\/DriveLens_复赛Demo\.mp4/);
+  assert.doesNotMatch(releasePackage, /AGENTS\.md|CLAUDE\.md/);
+  assert.doesNotMatch(voiceScript, /C:\\Users\\/);
 });
 
 test("evidence points transparently reproduce the ranking reversal", async () => {
@@ -69,7 +76,8 @@ test("all presentation and collaboration surfaces consume one diagnostic snapsho
   assert.match(app, /diagnosticSnapshot: snapshot/);
   assert.match(challenge, /snapshot: DiagnosticSnapshot/);
   assert.match(depth, /snapshot: DiagnosticSnapshot/);
-  assert.match(feishuRoute, /body\.snapshotId !== snapshot\.snapshotId/);
+  assert.match(feishuRoute, /parseRequiredSnapshotId\(body\.snapshotId\)/);
+  assert.match(feishuRoute, /requestedSnapshotId !== snapshot\.snapshotId/);
   assert.match(card, /snapshot\.hypotheses\[0\]/);
   assert.doesNotMatch(card, /incidents\.find|incident\.hypotheses\[0\]/);
 });
@@ -159,7 +167,8 @@ test("Feishu AI layer provides grounded chat, evidence tasks, and cited knowledg
   assert.match(intelligence, /knowledge_document/);
   assert.match(intelligence, /buildEvidenceTasks/);
   assert.match(intelligence, /不能改分、改排序或越过证据门禁/);
-  assert.match(route, /body\.snapshotId !== snapshot\.snapshotId/);
+  assert.match(route, /parseRequiredSnapshotId\(body\.snapshotId\)/);
+  assert.match(route, /requestedSnapshotId !== snapshot\.snapshotId/);
   assert.match(route, /local-task-outbox/);
   assert.match(route, /records\/batch_create/);
   assert.match(docs, /Aily/);
@@ -285,6 +294,14 @@ test("Feishu surfaces handle a real-case snapshot with no supported directions",
   };
   const executableFeishuRoute = feishuRoute
     .replace(/import \{ NextResponse \} from "next\/server";/, "const NextResponse = {};")
+    .replace(
+      /import \{ parseRequiredSnapshotId \} from "\.\.\/\.\.\/lib\/api-contract";/,
+      "const parseRequiredSnapshotId = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : null;",
+    )
+    .replace(
+      /import \{ guardRateLimit, guardWriteRequest \} from "\.\.\/\.\.\/lib\/api-write-guard";/,
+      "const guardRateLimit = () => null; const guardWriteRequest = () => null;",
+    )
     .replace(
       /import \{ buildIncidentReviewCard, sendFeishuInteractiveCard \} from "\.\.\/\.\.\/lib\/feishu-card";/,
       "const buildIncidentReviewCard = () => ({}); const sendFeishuInteractiveCard = async () => ({ ok: false });",

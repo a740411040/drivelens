@@ -1,6 +1,6 @@
 # DriveLens 初版提交风险说明
 
-**提交日期**：2026-08-14
+**提交日期**：2026-08-16
 **项目名称**：DriveLens — 无人车异常行为诊断工具箱
 **命题来源**：佑驾创新 — "如何用 AI 打造一套异常行为诊断工具箱"
 **提交版本**：v1.0.0（初版）
@@ -14,9 +14,12 @@
 | 项目源码 | Next.js 16 + React 19 + TypeScript 5.9 + Vite 8 全部源码 |
 | 演示数据 | 3 个确定性合成案例（突然刹停、异常等待、异常绕行） |
 | 真实案例评测 | 10 个脱敏夹具的保守评测答案（RCA-EXT-001 ~ 010） |
-| 自动化测试 | 15 项测试（HTML 结构断言 + 诊断工具箱断言），全部通过 |
+| 自动化测试 | 31 项测试（HTML 结构 + 诊断工具箱 + 共享计分行为 + 协同安全），全部通过 |
 | 项目文档 | README、演示讲解词、飞书接入指南、业务评估协议、产品审计报告 |
-| 构建验证 | `vinext build` 成功，ESLint 零错误 |
+| 复赛方案 DOCX | 已按最新视频状态重新生成并通过 OOXML 完整性、表格几何与结构审计；逐页 PNG 视觉验收仍受 LibreOffice profile 权限和 Word COM 审批服务 503 阻塞 |
+| Demo 视频 | 正式 MP4 已完成：240 秒、1920x1080、24fps、8 场景、27 条中文字幕、本地音床与转场音效；全片解码、音视频规格、黑场/静音和 8 场景代表帧均验收通过 |
+| 构建验证 | 当前源码的 TypeScript、ESLint、31 项回归、最新本地生产构建和 6 个首页静态资源均已通过；3 个协同 API 缺少 `snapshotId` 时均实际返回 400 |
+| 企业交付包 | `release/DriveLens-v1.0.0.zip` 与压缩包 SHA-256 已按最新源文件重新生成；正式 MP4、视频工程截图、逐文件 SHA-256、顶层目录和白名单均纳入并复验通过 |
 
 ---
 
@@ -61,7 +64,7 @@
 
 **缓解措施**：
 - 三级降级策略（feishu-card → bitable-only → local-outbox）确保任何环境下可演示
-- 配置项清晰（`.env.example`），企业租户配置后即可启用远程功能
+- 配置项清晰（`.env.example`），可用于启动企业租户端到端验收
 - `docs/FEISHU_SETUP.md` 和 `docs/FEISHU_AI_INTEGRATION.md` 提供完整接入指南
 
 ---
@@ -79,7 +82,7 @@
 1. 真实案例衍生数据已接入，证据边界和协同协议可运行
 2. 诊断链路工程闭环完整（异常重建 → 疑因竞争 → 证据门禁 → 补证改判 → 可信度校验 → 飞书协同）
 3. 10/10 案例在证据不足时诚实停止，未触发任何评测硬红线
-4. 代码可构建、可测试、可审计，15 项自动化测试全部通过
+4. 当前源码可测试、可审计，31 项自动化测试、最新本地生产构建、生产静态资源、协同 API 合同和企业交付包校验均已通过
 
 ---
 
@@ -101,10 +104,17 @@
 
 | 验证项 | 命令 | 结果 |
 |--------|------|------|
-| 项目构建 | `npm run build` | PASS |
+| 项目构建与生产静态资源 | `npm run release:package:native` | PASS（最新本地生产构建；首页引用的 6 个 JS/CSS 资源逐一返回成功） |
 | 代码规范 | `npm run lint` | PASS（零错误） |
-| 自动化测试 | `npm test` | PASS（15/15） |
+| 自动化测试 | `node --test --test-isolation=none` | PASS（31/31） |
 | RCA 评测校验 | `npm run assessment:check` | PASS（10/10 夹具，10/10 诚实停止） |
+| 协同 API 生产合同 | 对 3 个生产 API 发起缺少 `snapshotId` 的 POST | PASS（`/api/feishu`、`/api/feishu-ai`、`/api/feishu/review` 均返回 400） |
+| 生产界面桌面交互 | `http://localhost:3003/`，1280×720 | PASS（首屏信息层级、主诊断流程、阶段解锁和证据门禁可用；控制台 0 error / 0 warning）；移动端视口未完成独立验收 |
+| 企业交付包 | ZIP 解压、白名单、包内/包外 SHA-256 | PASS（正式 MP4 与视频工程截图已纳入，逐文件校验和压缩包 sidecar 一致）；全新 `npm ci` 受当前 npm 离线缓存缺包阻塞 |
+| 视频静态检查 | HyperFrames `lint` + 8 场景静态预览 | PASS（0 error / 1 时间轨密度 warning；无远程脚本，WAAPI seek 生效） |
+| 视频成片与媒体规格 | 浏览器确定性逐帧导出 + FFmpeg / FFprobe / 全片解码 / 黑场与静音检测 | PASS（5,760 帧连续无缺号；H.264 1920x1080 24fps + AAC 48kHz；240 秒；全片解码零错误；无 1 秒以上静音；仅 3 个约 0.5 秒设计转场黑场） |
+| HyperFrames 原生动态检查 | HyperFrames `check --snapshots` / `render` | BLOCKED（浏览器子进程 `spawn EPERM`；CLI 升级审批服务返回 503）；未将该项伪写为 PASS，最终成片采用上行确定性降级路径 |
+| DOCX 结构 / 视觉验收 | ZIP、表格几何、a11y / `render_docx.py` / Word COM | 结构 PASS；逐页视觉 BLOCKED（LibreOffice profile 创建 `WinError 5`；Word COM 提升权限审批服务返回 503） |
 | 硬红线检查 | 人工逐项核查 | 5/5 安全 |
 
 ---
